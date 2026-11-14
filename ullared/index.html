@@ -290,6 +290,8 @@
     <div class="chips" id="chips" aria-label="Förslag på pris"></div>
     <label for="name">Vad är det? (valfritt)</label>
     <input type="text" id="name" placeholder="t.ex. Barnjeans, röd" autocomplete="off" enterkeyhint="next">
+    <div class="labelrow"><label for="dept">Avdelning (valfritt)</label></div>
+    <select id="dept"></select>
     <label for="img" style="margin-top:10px">Bild- eller produktlänk (valfritt)</label>
     <input type="text" id="img" inputmode="url" placeholder="https://…" autocomplete="off" style="font-size:16px">
     <div class="fields">
@@ -344,6 +346,10 @@
       <input type="text" id="wText" placeholder="t.ex. Vinterskor stl 34" autocomplete="off" enterkeyhint="done">
     </div>
     <div>
+      <div class="labelrow"><label for="wDept">Avdelning (valfritt)</label></div>
+      <select id="wDept"></select>
+    </div>
+    <div>
       <label for="wPerson">Till vem? (valfritt)</label>
       <input type="text" id="wPerson" list="peopleList" placeholder="t.ex. Emma" autocomplete="off">
     </div>
@@ -389,7 +395,7 @@
     <input type="text" id="eName" autocomplete="off">
     <label for="eImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="eImg" inputmode="url" autocomplete="off" style="font-size:16px">
-    <label for="eDept" style="margin-top:10px">Avdelning</label>
+    <div class="labelrow" style="margin-top:10px"><label for="eDept">Avdelning</label></div>
     <select id="eDept"></select>
     <div class="fields">
       <div><label for="ePrice">Pris (kr)</label><input type="text" class="big" id="ePrice" inputmode="decimal" autocomplete="off"></div>
@@ -430,7 +436,7 @@
     <input type="text" id="wEditMax" inputmode="decimal" autocomplete="off">
     <label for="wEditImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="wEditImg" inputmode="url" autocomplete="off" style="font-size:16px">
-    <label for="wEditDept" style="margin-top:10px">Avdelning</label>
+    <div class="labelrow" style="margin-top:10px"><label for="wEditDept">Avdelning</label></div>
     <select id="wEditDept"></select>
     <div class="row">
       <button type="button" class="btn" id="wEditCancel">Avbryt</button>
@@ -446,6 +452,8 @@
     <textarea id="bText" placeholder="Emma:&#10;Vinterskor max 300&#10;Mössa&#10;Liam:&#10;Fotbollsstrumpor"></textarea>
     <label for="bPerson" style="margin-top:10px">Person för rader utan rubrik (valfritt)</label>
     <input type="text" id="bPerson" list="peopleList" autocomplete="off">
+    <label for="bDept" style="margin-top:10px">Avdelning för alla raderna (valfritt)</label>
+    <select id="bDept"></select>
     <div class="row">
       <button type="button" class="btn" id="bulkCancel">Avbryt</button>
       <button type="submit" class="btn primary">Lägg till</button>
@@ -606,7 +614,8 @@
       ['level', 'via', 'cells', 'color', 'sections'].forEach(function (k) { d[k] = def ? JSON.parse(JSON.stringify(def[k])) : (k === 'cells' || k === 'sections' ? [] : (k === 'level' ? '' : null)); });
       ['keywords', 'cube', 'floor', 'audience'].forEach(function (k) { delete d[k]; });   // från gissningen, används inte längre
     });
-    if (!s.deptLearn || typeof s.deptLearn !== 'object' || Array.isArray(s.deptLearn)) s.deptLearn = {};
+    s.deptSet = DEPT_SET;
+    delete s.deptLearn;   // appen gissar inte längre avdelning
     if (!s.view || typeof s.view !== 'object') s.view = {};
     if (s.view.wishes !== 'person' && s.view.wishes !== 'dept') s.view.wishes = 'dept';
     // Korgen visas per avdelning som standard. Har man själv valt "Senaste först" behålls det.
@@ -736,6 +745,7 @@
     $('countTxt').textContent = count + (count === 1 ? ' vara' : ' varor') + ' i korgen';
     renderWishes();
     renderVisit();
+    refreshDeptSelects();
     $('backupTip').hidden = !(state.items.length > 10 && (!state.lastExport || Date.now() - state.lastExport > 24 * 3600 * 1000));
 
     var bl = $('budgetLine'), bar = $('bar');
@@ -803,8 +813,8 @@
     var img = safeUrl($('img').value), lw = linked ? findWish(linked) : null, dept = '';
     if (ex) { ex.qty = Math.min(99, ex.qty + qty); if (img && !ex.img) ex.img = img; dept = ex.dept; }
     else {
-      // Köpt från listan: samma avdelning som önskningen. Annars gissar appen utifrån namnet.
-      dept = lw && lw.dept ? lw.dept : guessDept(name);
+      // Avdelningen väljer man själv i formuläret (Köp från listan fyller i önskningens avdelning).
+      dept = deptById($('dept').value) ? $('dept').value : '';
       state.items.push({ id: uid(), name: name, price: p, qty: qty, img: img, dept: dept });
     }
     if (linked) { if (lw) lw.done = true; setLink(null); }
@@ -836,7 +846,7 @@
     snap('ändrade ' + label(it));
     it.name = $('eName').value.trim(); it.img = safeUrl($('eImg').value); it.price = p; it.qty = Math.min(99, n);
     var nd = $('eDept').value;
-    if (nd !== (it.dept || '')) { it.dept = nd; learnDept(it.name, nd); }
+    it.dept = nd;
     save(); render(); toast('Sparade ändringen', true);
   };
   $('eDelete').onclick = function () {
@@ -1123,103 +1133,67 @@
   }
 
   /* ================= Avdelningar ================= */
-  // Ord som styr mot dam/herr/barn/baby men inte pekar ut en avdelning på egen hand.
-  var AUDIENCE = { dam: 'dam', damer: 'dam', kvinna: 'dam', tjej: 'dam', tjejer: 'dam', herr: 'herr', herrar: 'herr', man: 'herr', kille: 'herr', killar: 'herr',
-    barn: 'barn', junior: 'barn', ungdom: 'barn', kids: 'barn', pojke: 'barn', flicka: 'barn', baby: 'baby', bebis: 'baby' };
-  var AUD_PREFIX = ['dam', 'herr', 'barn', 'baby', 'bebis'];
-  var STOPWORDS = { och: 1, till: 1, for: 1, 'för': 1, med: 1, den: 1, det: 1, en: 1, ett: 1, st: 1, stl: 1, storlek: 1, ny: 1, nya: 1 };
-
   function deptById(id) { return id ? state.departments.find(function (d) { return d.id === id; }) : null; }
   function sortedDepts() { return state.departments.slice().sort(function (a, b) { return a.order - b.order; }); }
   function renumber(list) { list.forEach(function (d, i) { d.order = i + 1; }); }
+  // Sammanhängande takkuber per rad: ["C8","C9","C10","D8"] → "C8–C10, D8"
+  function cellRuns(cells) {
+    var rows = {}, out = [];
+    (cells || []).forEach(function (c) { var m = /^([A-K])(\d{1,2})$/.exec(c); if (m) (rows[m[1]] = rows[m[1]] || []).push(+m[2]); });
+    Object.keys(rows).sort().forEach(function (r) {
+      var n = rows[r].sort(function (x, y) { return x - y; }), s = n[0];
+      for (var i = 1; i <= n.length; i++) if (i === n.length || n[i] !== n[i - 1] + 1) { out.push(r + s + (n[i - 1] !== s ? '–' + r + n[i - 1] : '')); s = n[i]; }
+    });
+    return out.join(', ');
+  }
   function deptWhere(d) {
     if (!d || !d.level) return '';
-    var via = d.via ? (d.level === 'Plan 2' ? ' (rulltrappa vid ' + d.via + ')' : ' (trappa vid ' + d.via + ')') : '';
-    return d.level + via + (d.cube ? ' · takkub ' + d.cube : '');
+    if (d.via) return d.level + (d.level === 'Plan 2' ? ' · rulltrappa vid ' : ' · trappa vid ') + d.via;
+    return d.level + (d.cells && d.cells.length ? ' · ' + cellRuns(d.cells) : '');
   }
 
-  function words(text) {
-    return String(text || '').toLowerCase().replace(/[^a-zåäöéüæø0-9\s-]/g, ' ').split(/[\s-]+/).filter(Boolean);
-  }
-  // Enkel svensk plural/bestämd form: stövlar → stövl/stövel, byxor → byx, kuddar → kudd
-  function stems(w) {
-    var out = [w];
-    ['orna', 'arna', 'erna', 'or', 'ar', 'er', 'en', 'et', 'na', 'a', 'r', 'n'].forEach(function (suf) {
-      if (w.length - suf.length >= 3 && w.slice(-suf.length) === suf) out.push(w.slice(0, -suf.length));
-    });
-    var last = out[out.length - 1];
-    if (/[^aeiouyåäö]l$/.test(last)) out.push(last.slice(0, -1) + 'el');
-    return out;
-  }
-  function wordScore(tok, kw) {
-    if (tok === kw) return 3;
-    var ts = stems(tok), ks = stems(kw), i, j;
-    for (i = 0; i < ts.length; i++) if (ks.indexOf(ts[i]) >= 0) return 3;
-    // Sammansatta ord avgörs av sista delen: vinterstövlar → stövlar, barnstrumpor → strumpor
-    if (kw.length >= 4) for (i = 0; i < ks.length; i++) for (j = 0; j < ts.length; j++)
-      if (ts[j].length > ks[i].length && ts[j].slice(-ks[i].length) === ks[i]) return 2;
-    return 0;
-  }
-  function audienceOf(toks) {
-    var aud = {};
-    toks.forEach(function (t) {
-      if (AUDIENCE[t]) aud[AUDIENCE[t]] = 1;
-      AUD_PREFIX.forEach(function (p) { if (t.length > p.length + 3 && t.indexOf(p) === 0) aud[AUDIENCE[p]] = 1; });
-    });
-    return aud;
-  }
-  // Huvudordet i en text: sista ordet som inte är dam/herr/barn eller ett fyllnadsord ("chelsea stövlar dam" → stövlar)
-  function headWord(toks) {
-    for (var i = toks.length - 1; i >= 0; i--) {
-      var t = toks[i];
-      if (t.length >= 3 && !AUDIENCE[t] && !STOPWORDS[t] && !/^\d+$/.test(t)) return t;
-    }
-    return '';
-  }
-  // Gissar avdelning: först det appen lärt sig, sedan sökorden. Returnerar id eller ''.
-  function guessDept(text) {
-    var toks = words(text); if (!toks.length) return '';
-    var phrase = toks.join(' '), learn = state.deptLearn;
-    if (Object.prototype.hasOwnProperty.call(learn, phrase) && (learn[phrase] === '' || deptById(learn[phrase]))) return learn[phrase];
-    var aud = audienceOf(toks), hasAud = Object.keys(aud).length > 0, pairs = [], best = null;
-    for (var i = 0; i < toks.length - 1; i++) pairs.push(toks[i] + toks[i + 1]);   // "balans kudde" → "balanskudde"
-    state.departments.forEach(function (d) {
-      var score = 0, kws = d.keywords || [];
-      toks.forEach(function (t) {
-        if (learn[t] === d.id) score += 5;
-        if (AUDIENCE[t]) return;
-        var m = 0; kws.forEach(function (k) { var s = wordScore(t, k); if (s > m) m = s; }); score += m;
-      });
-      pairs.forEach(function (p) { if (kws.some(function (k) { return wordScore(p, k) === 3; })) score += 4; });
-      if (!score) return;
-      if (d.audience && aud[d.audience]) score += 2;
-      if (d.audience && hasAud && !aud[d.audience]) score -= 2;
-      if (score > 0 && (!best || score > best.score || (score === best.score && d.order < best.d.order))) best = { d: d, score: score };
-    });
-    return best ? best.d.id : '';
-  }
-  // Kommer ihåg ett byte: hela texten och huvudordet.
-  function learnDept(text, id) {
-    var toks = words(text); if (!toks.length) return;
-    state.deptLearn[toks.join(' ')] = id;
-    var h = headWord(toks);
-    if (h) { if (id) state.deptLearn[h] = id; else delete state.deptLearn[h]; }
-  }
-
+  // Väljer avdelning i en lista, grupperad per plan i vandringsordning.
   function fillDeptSelect(sel, current) {
     sel.innerHTML = '';
-    var o = document.createElement('option'); o.value = ''; o.textContent = 'Ingen (Övrigt)'; sel.appendChild(o);
+    var o = document.createElement('option'); o.value = ''; o.textContent = 'Ingen avdelning'; sel.appendChild(o);
+    var groups = {}, order = [];
     sortedDepts().forEach(function (d) {
-      var op = document.createElement('option'); op.value = d.id; op.textContent = d.name; sel.appendChild(op);
+      var k = d.level || 'Egna';
+      if (!groups[k]) { groups[k] = document.createElement('optgroup'); groups[k].label = k; order.push(k); }
+      var op = document.createElement('option'); op.value = d.id; op.textContent = d.name; groups[k].appendChild(op);
     });
+    order.forEach(function (k) { sel.appendChild(groups[k]); });
     sel.value = deptById(current) ? current : '';
+    syncPickBtn(sel);
+  }
+  // Avdelningslistorna är dolda <select>; en knapp visar valet och öppnar väljaren.
+  function syncPickBtn(sel) {
+    var b = $(sel.id + 'Btn'), d = deptById(sel.value); if (!b) return;
+    b.textContent = d ? d.name : 'Välj avdelning';
+    b.classList.toggle('empty', !d);
+  }
+  ['dept', 'wDept', 'bDept', 'eDept', 'wEditDept'].forEach(function (id) {
+    var sel = $(id), b = document.createElement('button');
+    b.type = 'button'; b.id = id + 'Btn'; b.className = 'pickbtn';
+    sel.hidden = true; sel.parentNode.insertBefore(b, sel.nextSibling);
+    var lab = document.querySelector('label[for="' + id + '"]'); if (lab) lab.setAttribute('for', b.id);
+    b.onclick = function () {
+      var txt = { dept: 'name', wDept: 'wText', eDept: 'eName', wEditDept: 'wEditText' }[id];
+      openDeptPicker(sel.value, txt ? $(txt).value.trim() : '', function (v) {
+        sel.value = v; syncPickBtn(sel); sel.dispatchEvent(new Event('change'));
+      });
+    };
+  });
+  // Formulärens listor byggs om när avdelningarna ändras; valet behålls.
+  function refreshDeptSelects() {
+    ['dept', 'wDept', 'bDept'].forEach(function (id) { var s = $(id); fillDeptSelect(s, s.value); });
   }
   function deptChip(obj, text) {
     var d = deptById(obj.dept), b = document.createElement('button');
     b.type = 'button'; b.className = 'deptchip' + (d ? '' : ' none');
     var pill = document.createElement('span'); pill.textContent = d ? d.name : 'Välj avdelning'; b.appendChild(pill);
     b.setAttribute('aria-label', (d ? 'Avdelning: ' + d.name : 'Ingen avdelning') + '. Byt avdelning för ' + text);
-    b.onclick = function () { openDeptPicker(obj, text); };
+    b.onclick = function () { openDeptPicker(obj.dept, text, function (id) { setDept(obj, id, text); }); };
     return b;
   }
   // Byter avdelning på en vara eller önskning, med ångra och inlärning.
@@ -1227,25 +1201,33 @@
     if ((obj.dept || '') === id) return;
     var d = deptById(id);
     snap('bytte avdelning för ' + text);
-    obj.dept = id; learnDept(obj.name || obj.text || '', id);
+    obj.dept = id;
     save(); render(); toast(text + ' → ' + (d ? d.name : 'Övrigt'), true);
   }
-  var pickTarget = null;
-  function openDeptPicker(obj, text) {
-    pickTarget = { obj: obj, text: text };
-    $('deptDlgFor').textContent = text;
-    var box = $('deptPick'); box.innerHTML = '';
+  // Väljaren: avdelningar per plan i vandringsordning, med undergrupperna som i Gekås avdelningslista.
+  var pickDone = null;
+  function openDeptPicker(current, forText, onPick) {
+    pickDone = onPick;
+    $('deptDlgFor').textContent = forText || '';
+    $('deptDlgFor').hidden = !forText;
+    var box = $('deptPick'), lastLevel = null; box.innerHTML = '';
+    if (!deptById(current)) current = '';
     sortedDepts().concat([null]).forEach(function (d) {
-      var b = document.createElement('button'); b.type = 'button';
-      var id = d ? d.id : '', cur = (obj.dept || '') === id || (!d && !deptById(obj.dept));
-      var t = document.createElement('b'); t.textContent = d ? d.name : 'Ingen avdelning (Övrigt)'; b.appendChild(t);
-      if (d && deptWhere(d)) { var s = document.createElement('span'); s.textContent = deptWhere(d); b.appendChild(s); }
-      b.setAttribute('aria-current', String(cur));
-      b.onclick = function () { $('deptDlg').close(); setDept(pickTarget.obj, id, pickTarget.text); pickTarget = null; };
-      box.appendChild(b);
+      var level = d ? (d.level || 'Egna') : '';
+      if (d && level !== lastLevel) { var hd = document.createElement('h3'); hd.textContent = level; box.appendChild(hd); lastLevel = level; }
+      if (!d) { var sp = document.createElement('div'); sp.className = 'pickgap'; box.appendChild(sp); }
+      var btn = document.createElement('button'); btn.type = 'button';
+      var id = d ? d.id : '';
+      var t = document.createElement('b'); t.textContent = d ? d.name : 'Ingen avdelning (Övrigt)'; btn.appendChild(t);
+      var subs = d ? (d.sections || []).filter(function (x) { return x !== d.name; }) : [];
+      if (subs.length) { var s = document.createElement('span'); s.textContent = subs.join(', '); btn.appendChild(s); }
+      btn.setAttribute('aria-current', String(current === id));
+      btn.onclick = function () { $('deptDlg').close(); var fn = pickDone; pickDone = null; if (fn) fn(id); };
+      box.appendChild(btn);
     });
     $('deptDlg').showModal();
-    var curBtn = box.querySelector('[aria-current=true]'); if (curBtn) curBtn.scrollIntoView({ block: 'center' });
+    var curBtn = current && box.querySelector('[aria-current=true]');
+    if (curBtn) curBtn.scrollIntoView({ block: 'center' }); else box.scrollTop = 0;   // inget valt: börja överst
   }
   $('deptDlgCancel').onclick = function () { $('deptDlg').close(); };
 
@@ -1364,6 +1346,7 @@
     var w = id && findWish(id);
     $('linkBanner').hidden = !w;
     if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '');
+    if (w && deptById(w.dept)) { $('dept').value = w.dept; syncPickBtn($('dept')); }
   }
   $('linkCancel').onclick = function () { setLink(null); };
 
@@ -1456,10 +1439,10 @@
     var person = $('wPerson').value.trim(), wimg = safeUrl($('wImg').value), max = parseMax($('wMax').value);
     if (max < 0) { toast('Maxpriset ska vara ett belopp, t.ex. 300', false); $('wMax').focus(); return; }
     snap('la till i listan: ' + t);
-    var dept = guessDept(t), dd = deptById(dept);
+    var dept = deptById($('wDept').value) ? $('wDept').value : '', dd = deptById(dept);
     state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg, dept: dept, max: max });
     save(); render(); toast('Tillagd: ' + t + ' · ' + (dd ? dd.name : 'Övrigt'), true);
-    $('wText').value = ''; $('wImg').value = ''; $('wMax').value = ''; $('wText').focus();
+    $('wText').value = ''; $('wImg').value = ''; $('wMax').value = ''; $('wDept').value = ''; syncPickBtn($('wDept')); $('wText').focus();
   }
   $('wAdd').onclick = addWish;
   $('wText').addEventListener('keydown', function (e) { if (e.key === 'Enter') addWish(); });
@@ -1480,7 +1463,7 @@
     if (max < 0) { e.preventDefault(); $('wEditMax').setCustomValidity('Skriv ett belopp, t.ex. 300'); $('wEditMax').reportValidity(); return; }
     snap('ändrade ' + w.text); w.text = t; w.person = $('wEditPerson').value.trim(); w.img = safeUrl($('wEditImg').value); w.max = max;
     var nd = $('wEditDept').value;
-    if (nd !== (w.dept || '')) { w.dept = nd; learnDept(w.text, nd); }
+    w.dept = nd;
     save(); render(); toast('Sparade ändringen', true);
   };
   $('wEditDelete').onclick = function () {
@@ -1495,7 +1478,7 @@
   $('wBulk').onclick = function () { $('bText').value = ''; $('bPerson').value = $('wPerson').value; $('bulkDlg').showModal(); };
   $('bulkCancel').onclick = function () { $('bulkDlg').close(); };
   $('bulkForm').onsubmit = function () {
-    var cur = $('bPerson').value.trim(), n = 0, add = [];
+    var cur = $('bPerson').value.trim(), n = 0, add = [], bulkDept = deptById($('bDept').value) ? $('bDept').value : '';
     $('bText').value.split('\n').forEach(function (line) {
       line = line.trim(); if (!line) return;
       var head = line.match(/^([^:]{1,30}):$/);
@@ -1506,7 +1489,7 @@
       // "Vinterskor max 300" eller "Vinterskor (max 300 kr)" ger maxpris 300
       var mm = line.match(/[\s,(]*\bmax\.?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:kr|:-)?\)?\s*$/i), max = 0;
       if (mm) { max = Math.max(0, parseMax(mm[1])); line = line.slice(0, mm.index).trim(); }
-      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: guessDept(line), max: max }); n++; }
+      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: bulkDept, max: max }); n++; }
     });
     if (!n) return;
     snap('la till ' + n + ' i listan');
@@ -1520,7 +1503,7 @@
     };
     if (state.view.wishes === 'dept') {
       groupByDept(state.wishes).forEach(function (g) {
-        lines.push((g.dept ? g.dept.name + (g.dept.cube ? ' (' + g.dept.cube + ')' : '') : 'Övrigt') + ':');
+        lines.push((g.dept ? g.dept.name + (deptWhere(g.dept) ? ' (' + deptWhere(g.dept) + ')' : '') : 'Övrigt') + ':');
         g.list.forEach(function (w) { lines.push(line(w, true)); });
         lines.push('');
       });
@@ -1622,16 +1605,10 @@
         seen[d.id] = 1;
         var c = JSON.parse(JSON.stringify(d));
         c.name = str(d.name, 80); c.order = num(d.order) > 0 ? d.order : i + 1;
-        if (!Array.isArray(c.keywords)) c.keywords = [];
-        c.keywords = c.keywords.filter(function (k) { return typeof k === 'string'; }).slice(0, 500);
         return c;
       });
     }
-    if (o.deptLearn !== undefined) {
-      if (!o.deptLearn || typeof o.deptLearn !== 'object' || Array.isArray(o.deptLearn)) fail('Det inlärda om avdelningar är trasigt.');
-      s.deptLearn = {};
-      Object.keys(o.deptLearn).slice(0, 5000).forEach(function (k) { if (typeof o.deptLearn[k] === 'string') s.deptLearn[k.slice(0, 200)] = o.deptLearn[k].slice(0, 80); });
-    }
+    // Äldre backuper kan ha "deptLearn" (det appen lärt sig när den gissade). Det ignoreras.
     if (o.visit && typeof o.visit === 'object') {
       var g = o.visit.geo, lat = g && num(g.lat), lng = g && num(g.lng);
       s.visit = { cartNo: str(o.visit.cartNo, 40), parking: str(o.visit.parking, 120),
@@ -1761,7 +1738,6 @@
     ids = {}; state.departments.forEach(function (d) { ids[d.id] = 1; });
     inc.departments.forEach(function (d) { if (!ids[d.id]) { d.order = state.departments.length + 1; state.departments.push(d); added.depts++; } });
     renumber(sortedDepts());
-    Object.keys(inc.deptLearn).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(state.deptLearn, k)) state.deptLearn[k] = inc.deptLearn[k]; });
     if (!state.visit.cartNo) state.visit.cartNo = inc.visit.cartNo;
     if (!state.visit.parking) state.visit.parking = inc.visit.parking;
     if (!state.visit.geo) state.visit.geo = inc.visit.geo;
