@@ -43,11 +43,10 @@
   /* Sidhuvud med totalsumma */
   .total { position:sticky; top:0; z-index:10; background:rgba(27,20,70,.82); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
     padding:calc(env(safe-area-inset-top,0px) + 8px) 16px 8px; border-bottom:1px solid var(--line); }
-  .total .top { display:flex; justify-content:space-between; align-items:center; gap:10px; max-width:560px; margin:0 auto; }
+  .total .top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; max-width:560px; margin:0 auto; }
+  .total .label { text-align:right; display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:4px 0; }
   .total .label { font-size:13px; font-weight:500; color:var(--muted); }
   .total .sum { font-size:30px; font-weight:700; color:var(--tag); font-variant-numeric:tabular-nums; letter-spacing:-.5px; line-height:1.15; white-space:nowrap; }
-  .undo { min-height:44px; padding:0 16px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-weight:700; }
-  .undo:disabled { opacity:.4; }
   .budgetline { font-size:13px; font-weight:600; margin:6px auto 0; display:none; max-width:560px; }
   .bar { height:6px; border-radius:3px; background:rgba(255,255,255,.14); margin:6px auto 0; overflow:hidden; display:none; max-width:560px; }
   .bar > i { display:block; height:100%; background:var(--tag); width:0; transition:width .2s; border-radius:3px; }
@@ -202,11 +201,8 @@
 
 <div class="total">
   <div class="top">
-    <div>
-      <div class="label"><span id="countTxt">0 varor</span></div>
-      <div class="sum" id="sum" aria-live="polite">0 kr</div>
-    </div>
-    <button class="undo" id="undoBtn" disabled>Ångra</button>
+    <div class="sum" id="sum" aria-live="polite">0 kr</div>
+    <div class="label"><span id="countTxt">0 varor</span></div>
   </div>
   <div class="budgetline" id="budgetLine" aria-live="polite"></div>
   <div class="bar" id="bar"><i></i></div>
@@ -519,7 +515,6 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { $('toast').classList.remove('show'); }, 6000);
   }
-  $('undoBtn').onclick = undo;
   $('toastUndo').onclick = function () { $('toast').classList.remove('show'); undo(); };
 
   /* ---------- Render ---------- */
@@ -528,7 +523,6 @@
     var sum = total(), count = state.items.reduce(function (s, i) { return s + i.qty; }, 0);
     $('sum').textContent = fmt(sum);
     $('countTxt').textContent = count + (count === 1 ? ' vara' : ' varor') + ' i korgen';
-    $('undoBtn').disabled = !history.length;
     renderWishes();
     updateHint();
 
