@@ -123,6 +123,40 @@
   .check-row { display:flex; align-items:center; gap:10px; min-height:44px; margin-top:8px; font-size:15px; color:var(--ink); }
   .check-row input { width:22px; height:22px; }
   .sr { position:absolute; left:-9999px; }
+
+  /* Avdelningar */
+  .deptchip { min-height:44px; max-width:100%; padding:0 12px; border-radius:999px; border:2px solid var(--line); background:var(--surface);
+    font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+  .deptchip.none { border-style:dashed; color:var(--muted); font-weight:600; }
+  .item .acts .deptchip { flex:0 1 auto; min-width:0; font-size:14px; }
+  .wcol { display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
+  .wmeta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+  .wmeta .who { font-size:14px; color:var(--muted); }
+  .seg { display:inline-flex; border:2px solid var(--ink); border-radius:999px; overflow:hidden; margin-top:10px; }
+  .seg button { min-height:44px; padding:0 14px; border:0; background:var(--surface); font-weight:700; font-size:15px; }
+  .seg button + button { border-left:2px solid var(--ink); }
+  .seg button[aria-pressed=true] { background:var(--ink); color:var(--bg); }
+  .grouphead { margin-top:18px; }
+  .wishgroup .grouphead { margin-top:0; }
+  .grouphead h3 { font-size:16px; margin:0; display:flex; justify-content:space-between; gap:10px; }
+  .grouphead h3 small { color:var(--muted); font-weight:600; font-size:14px; white-space:nowrap; }
+  .grouphead .where { font-size:13px; color:var(--muted); margin:1px 0 2px; }
+  .picklist { display:grid; gap:6px; max-height:60vh; overflow:auto; margin:10px 0; padding:2px; }
+  .picklist button { min-height:48px; text-align:left; padding:4px 12px; border-radius:10px; border:2px solid var(--line); background:var(--surface); }
+  .picklist button b { display:block; font-size:16px; }
+  .picklist button span { display:block; font-size:13px; color:var(--muted); }
+  .picklist button[aria-current=true] { border-color:var(--ink); background:var(--tag); color:#1a1a1a; }
+  .picklist button[aria-current=true] span { color:#1a1a1a; }
+  dialog h2 { margin-bottom:6px; }
+  select { width:100%; font:inherit; font-size:17px; min-height:48px; padding:6px 10px; border:2px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); }
+  .deptrow { display:grid; grid-template-columns:44px 44px 1fr 44px; gap:6px; align-items:center; padding:4px 0; border-bottom:1px solid var(--line); }
+  .deptrow button { width:44px; height:44px; border-radius:10px; border:2px solid var(--line); background:var(--surface); font-weight:800; font-size:18px; }
+  .deptrow button:disabled { opacity:.35; }
+  .deptrow input { font-size:16px !important; padding:6px 8px !important; }
+  .deptrow .del { color:var(--red); border-color:var(--red); }
+  .depts-scroll { max-height:55vh; overflow:auto; margin:8px 0; }
+  .addrow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  .addrow .btn { min-height:48px; padding:0 14px; }
 </style>
 </head>
 <body>
@@ -188,13 +222,18 @@
   </div>
 
   <div class="listhead"><h2>Korgen</h2></div>
+  <div class="seg" role="group" aria-label="Visa korgen" id="itemView" hidden>
+    <button type="button" data-view="recent">Senaste först</button>
+    <button type="button" data-view="dept">Per avdelning</button>
+  </div>
   <input type="search" id="search" placeholder="Sök i korgen" aria-label="Sök i korgen" style="font-size:16px;display:none">
-  <ul id="list"></ul>
+  <div id="list"></div>
   <div class="empty" id="empty">Inget i korgen än.</div>
 
   <div class="tools">
     <button class="linkbtn neutral" id="budgetBtn">Budget &amp; prisgräns</button>
     <button class="linkbtn neutral" id="shareBtn">Dela / kopiera lista</button>
+    <button class="linkbtn neutral" id="deptSettingsBtn">Avdelningar</button>
     <button class="linkbtn" id="clearBtn">Töm korgen</button>
   </div>
 
@@ -223,12 +262,17 @@
   </div>
 
   <div class="listhead"><h2>Att köpa</h2><span id="wishCount" style="color:var(--muted);font-size:14px"></span></div>
+  <div class="seg" role="group" aria-label="Visa listan" id="wishView">
+    <button type="button" data-view="person">Per person</button>
+    <button type="button" data-view="dept">Per avdelning</button>
+  </div>
   <div class="filters" id="wishFilter"></div>
   <label class="check-row"><input type="checkbox" id="hideDone"> Dölj de som är klara</label>
   <div id="wishes"></div>
   <div class="empty" id="wishEmpty">Listan är tom. Lägg till önskningar ovan.</div>
   <div class="tools">
     <button class="linkbtn neutral" id="wShare">Dela listan</button>
+    <button class="linkbtn neutral" id="deptSettingsBtn2">Avdelningar</button>
     <button class="linkbtn" id="wClearDone">Ta bort klara</button>
   </div>
 </section>
@@ -242,6 +286,8 @@
     <input type="text" id="eName" autocomplete="off">
     <label for="eImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="eImg" inputmode="url" autocomplete="off" style="font-size:16px">
+    <label for="eDept" style="margin-top:10px">Avdelning</label>
+    <select id="eDept"></select>
     <div class="fields">
       <div><label for="ePrice">Pris (kr)</label><input type="text" class="big" id="ePrice" inputmode="decimal" autocomplete="off"></div>
       <div><label for="eQty">Antal</label><input type="number" class="big" id="eQty" min="1" max="99" inputmode="numeric" style="width:90px"></div>
@@ -275,6 +321,8 @@
     <input type="text" id="wEditPerson" list="peopleList" autocomplete="off">
     <label for="wEditImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="wEditImg" inputmode="url" autocomplete="off" style="font-size:16px">
+    <label for="wEditDept" style="margin-top:10px">Avdelning</label>
+    <select id="wEditDept"></select>
     <div class="row">
       <button type="button" class="btn" id="wEditCancel">Avbryt</button>
       <button type="submit" class="btn primary">Spara</button>
@@ -296,27 +344,112 @@
   </form>
 </dialog>
 
+<dialog id="deptDlg" aria-labelledby="deptDlgTitle">
+  <h2 id="deptDlgTitle">Välj avdelning</h2>
+  <p class="small" id="deptDlgFor" style="margin:0"></p>
+  <div class="picklist" id="deptPick"></div>
+  <div class="row"><button type="button" class="btn" id="deptDlgCancel">Avbryt</button></div>
+</dialog>
+
+<dialog id="deptSetDlg" aria-labelledby="deptSetTitle">
+  <h2 id="deptSetTitle">Avdelningar</h2>
+  <p class="small" style="margin:0">Ordningen är vägen genom varuhuset. Flytta upp och ner, byt namn eller lägg till egna.</p>
+  <div class="depts-scroll" id="deptSetList"></div>
+  <label for="deptNewName">Ny avdelning</label>
+  <div class="addrow">
+    <input type="text" id="deptNewName" autocomplete="off" placeholder="t.ex. Kassorna">
+    <button type="button" class="btn" id="deptNewAdd">Lägg till</button>
+  </div>
+  <div class="row">
+    <button type="button" class="btn" id="deptSetUndo">Ångra</button>
+    <button type="button" class="btn" id="deptSetReset">Återställ standard</button>
+  </div>
+  <div class="row"><button type="button" class="btn primary" id="deptSetClose">Klar</button></div>
+</dialog>
+
+<!-- Standardavdelningar från avdelningar.json (Gekås Ullared, november 2026). Uppdateras med tools/embed-avdelningar.js -->
+<script type="application/json" id="deptData">
+[
+{"id":"rengoring","name":"Rengöring","floor":1,"level":"Plan 1","via":null,"cube":"A3","audience":null,"order":1,"sections":[{"name":"Diskmedel","cube":"A3","floor":1},{"name":"Engångsartiklar hushålls","cube":"A3","floor":1},{"name":"Städartiklar","cube":"A3","floor":1},{"name":"Tvättmedel","cube":"A3","floor":1}],"keywords":["rengöring","diskmedel","tvättmedel","sköljmedel","städartiklar","städ","disktrasa","svamp","mopp","soppåsar","hushållspapper","toalettpapper","toapapper","diskborste","engångsartiklar","hushålls","rengöringsmedel"]},
+{"id":"glasogonfabriken","name":"Glasögonfabriken","floor":1,"level":"Plan 1","via":null,"cube":"A7","audience":null,"order":2,"sections":[{"name":"Glasögon optiker","cube":"A7","floor":1}],"keywords":["glasögon","optiker","linser","synundersökning"]},
+{"id":"grona-rummet","name":"Gröna rummet","floor":1,"level":"Plan 1","via":null,"cube":"A9","audience":null,"order":3,"sections":[{"name":"Blommor & Växter","cube":"A9","floor":1},{"name":"Konstväxter","cube":"B9","floor":1},{"name":"Krukor","cube":"B9","floor":1},{"name":"Trädgård","cube":"B8","floor":1}],"keywords":["blommor","växter","växt","konstväxt","konstväxter","kruka","krukor","jord","frön","blomkruka","trädgård"]},
+{"id":"hemtextil","name":"Hemtextil","floor":1,"level":"Plan 1","via":null,"cube":"A11","audience":null,"order":4,"sections":[{"name":"Duschdraperier","cube":"A11","floor":1},{"name":"Gardiner & Dukar","cube":"A9","floor":1},{"name":"Garn","cube":"A11","floor":1},{"name":"Handdukar","cube":"B12","floor":1},{"name":"Kuddar & Täcken","cube":"B11","floor":1},{"name":"Mattor","cube":"B12","floor":1},{"name":"Sängkläder","cube":"A11","floor":1}],"keywords":["hemtextil","duschdraperi","gardin","gardiner","duk","dukar","garn","handduk","handdukar","påslakan","lakan","örngott","kudde","täcke","pläd","matta","sängkläder","duschdraperier","kuddar","täcken","mattor"]},
+{"id":"belysning","name":"Belysning","floor":1,"level":"Plan 1","via":null,"cube":"B10","audience":null,"order":5,"sections":[{"name":"Elmaterial","cube":"B10","floor":1},{"name":"Inne- & Utebelysning","cube":"B10","floor":1},{"name":"Lampskärmar","cube":"B12","floor":1},{"name":"Ljuskällor","cube":"C11","floor":1}],"keywords":["belysning","lampa","lampor","glödlampa","led","lampskärm","ljusslinga","elmaterial","skarvsladd","uteslinga","inne","utebelysning","lampskärmar","ljuskällor"]},
+{"id":"livsmedel","name":"Livsmedel","floor":1,"level":"Plan 1","via":null,"cube":"C6","audience":null,"order":6,"sections":[{"name":"Bröd, Kakor & Kex","cube":"C6","floor":1},{"name":"Charkuterier","cube":"C4","floor":1},{"name":"Drycker","cube":"C7","floor":1},{"name":"Frukt, Grönt & Bär","cube":"D4","floor":1},{"name":"Godis & Snacks","cube":"D6","floor":1},{"name":"Godispåsar","cube":"B7","floor":1},{"name":"Hälsokost","cube":"D7","floor":1},{"name":"Konserver och torrvaror","cube":"B4","floor":1},{"name":"Kyl- & Frysvaror","cube":"C5","floor":1},{"name":"Kött, Fågel & Fisk","cube":"C4","floor":1},{"name":"Mejeri & Ost","cube":"C5","floor":1},{"name":"Sportdrycker","cube":"D7","floor":1}],"keywords":["livsmedel","mat","bröd","kakor","kex","chark","charkuterier","drycker","läsk","kaffe","te","godis","choklad","chips","lösgodis","ost","korv","frukt","grönt","bär","snacks","godispåsar","hälsokost","konserver","torrvaror","kyl","frysvaror","kött","fågel","fisk","mejeri","sportdrycker","kosttillskott","bars","shakes","proteinbar","proteinpulver","vitaminer","julgodis","juldryck","julmust"]},
+{"id":"till-hemmet","name":"Till hemmet","floor":1,"level":"Plan 1","via":null,"cube":"C9","audience":null,"order":7,"sections":[{"name":"Engångsartiklar","cube":"C9","floor":1},{"name":"Förvaring","cube":"C9","floor":1},{"name":"Glas & Porslin","cube":"D8","floor":1},{"name":"Husgeråd","cube":"B12","floor":1},{"name":"Inredning","cube":"D10","floor":1},{"name":"Kontorsmatrial och konstnärstillbehör","cube":"C12","floor":1},{"name":"Ljus","cube":"C10","floor":1},{"name":"Ramar & Tavlor","cube":"D8","floor":1},{"name":"Servetter","cube":"C9","floor":1},{"name":"Väggur","cube":"C11","floor":1}],"keywords":["hemmet","förvaring","förvaringslåda","glas","porslin","tallrik","tallrikar","kopp","koppar","mugg","bestick","husgeråd","kastrull","stekpanna","kökredskap","inredning","dekoration","kontorsmaterial","pennor","papper","ljus","ljusstake","ram","tavla","servetter","väggur","klocka","vas","engångsartiklar","kontorsmatrial","konstnärstillbehör","ramar","tavlor","konstnärsmaterial","presenttillbehör","presentpapper","presentsnöre","vykort","gratulationskort","födelsedagskort","kontor","pyssel"]},
+{"id":"kroppsvard","name":"Kroppsvård","floor":1,"level":"Plan 1","via":null,"cube":"D2","audience":null,"order":8,"sections":[{"name":"Hygienartiklar","cube":"D2","floor":1},{"name":"Hårvård","cube":"C2","floor":1},{"name":"Kroppsvård","cube":"D2","floor":1},{"name":"Munvård","cube":"C3","floor":1}],"keywords":["kroppsvård","hygienartiklar","hårvård","schampo","balsam","tvål","duschtvål","tandkräm","tandborste","deodorant","rakhyvel","bindor","tamponger","solkräm","munvård"]},
+{"id":"kosmetik","name":"Kosmetik","floor":1,"level":"Plan 1","via":null,"cube":"E3","audience":null,"order":9,"sections":[{"name":"Bijouterier","cube":"E3","floor":1},{"name":"Doft & Smink","cube":"E3","floor":1},{"name":"Hudvård","cube":"E3","floor":1},{"name":"Hårfärgning","cube":"D3","floor":1},{"name":"Hårstyling","cube":"E3","floor":1},{"name":"Läs & Solglasögon","cube":"F5","floor":1}],"keywords":["kosmetik","bijouterier","smycken","örhängen","halsband","armband","doft","parfym","smink","mascara","läppstift","nagellack","hudvård","ansiktskräm","hårfärg","hårstyling","hårspray","läsglasögon","solglasögon","hårfärgning","läs"]},
+{"id":"vaskor","name":"Väskor","floor":1,"level":"Plan 1","via":null,"cube":"F6","audience":null,"order":10,"sections":[{"name":"Handväskor","cube":"F6","floor":1},{"name":"Neccessärer","cube":"F6","floor":1},{"name":"Plånböcker","cube":"F7","floor":1},{"name":"Resväskor","cube":"F7","floor":1},{"name":"Ryggsäckar","cube":"F7","floor":1}],"keywords":["väskor","väska","handväska","necessär","neccessär","plånbok","plånböcker","resväska","ryggsäck","ryggsäckar","axelväska","handväskor","neccessärer","resväskor"]},
+{"id":"damklader","name":"Damkläder","floor":1,"level":"Plan 1","via":null,"cube":"F3","audience":"dam","order":11,"sections":[{"name":"Dammode","cube":"F3","floor":1},{"name":"Mammakläder","cube":"J3","floor":1},{"name":"Pernilla Wahlgren","cube":"I2","floor":1},{"name":"Stora Storlekar dam","cube":"G4","floor":1},{"name":"Underkläder dam","cube":"H6","floor":1},{"name":"Ytterkläder dam","cube":"H5","floor":1}],"keywords":["dam","dammode","mammakläder","klänning","kjol","blus","bh","trosor","leggings","tights","strumpor","strumpa","strumpbyxor","underkläder","nattlinne","pyjamas","morgonrock","jacka","kofta","byxor","byxa","tröja","jeans","linne","t-shirt","pernilla","wahlgren","ytterkläder"]},
+{"id":"herrklader","name":"Herrkläder","floor":1,"level":"Plan 1","via":null,"cube":"G2","audience":"herr","order":12,"sections":[{"name":"Glenn Strömberg","cube":"G2","floor":1},{"name":"Herrmode","cube":"F2","floor":1},{"name":"Stora Storlekar herr","cube":"H1","floor":1},{"name":"Underkläder herr","cube":"J2","floor":1},{"name":"Ytterkläder herr","cube":"H2","floor":1}],"keywords":["herr","herrmode","skjorta","kalsonger","boxer","jeans","chinos","kostym","slips","t-shirt","hoodie","strumpor","strumpa","byxor","byxa","tröja","jacka","glenn","strömberg","underkläder","ytterkläder"]},
+{"id":"hemelektronik","name":"Hemelektronik","floor":1,"level":"Plan 1","via":null,"cube":"G9","audience":null,"order":13,"sections":[{"name":"Batterier","cube":"G9","floor":1},{"name":"Gaming","cube":"G9","floor":1},{"name":"Hushållsmaskiner","cube":"H8","floor":1},{"name":"Hår- & Kroppsvård","cube":"H9","floor":1},{"name":"Mobiltillbehör","cube":"H9","floor":1},{"name":"Stereo & Radio","cube":"H8","floor":1}],"keywords":["hemelektronik","batterier","batteri","gaming","hushållsmaskiner","hörlurar","laddare","högtalare","radio","stereo","dammsugare","kaffebryggare","vattenkokare","brödrost","elvisp","hårtork","plattång","rakapparat","eltandborste","hår","kroppsvård","mobiltillbehör","tv","dvd","blu-ray"]},
+{"id":"baby","name":"Baby","floor":1,"level":"Plan 1","via":null,"cube":"G12","audience":"baby","order":14,"sections":[{"name":"Babyartiklar","cube":"G12","floor":1},{"name":"Babyhygien","cube":"G12","floor":1},{"name":"Babysängkläder","cube":"G12","floor":1},{"name":"Biltillbehör barn","cube":"G12","floor":1}],"keywords":["baby","babyartiklar","babyhygien","babysängkläder","napp","nappflaska","blöja","blöjor","body","bodys","skötväska","barnvagn","haklapp","biltillbehör","babykläder","nappar","skötbord","bilbarnstol","babysitter"]},
+{"id":"lek","name":"Lek","floor":1,"level":"Plan 1","via":null,"cube":"H10","audience":null,"order":15,"sections":[{"name":"Lego","cube":"H10","floor":1},{"name":"Leksaker","cube":"E11","floor":1},{"name":"Måla & Rita","cube":"E12","floor":1},{"name":"Spel & Pyssel","cube":"F11","floor":1}],"keywords":["lek","leksaker","leksak","lego","docka","pussel","spel","sällskapsspel","gosedjur","nalle","måla","rita","kritor","pyssel","leksaksbil","pokémon","pokemon","samlarkort","kortlek","fidget","slime","barbie","playmobil","brio"]},
+{"id":"barnskor","name":"Barnskor","floor":2,"level":"Plan 2","via":"I10","cube":"F10","audience":"barn","order":16,"sections":[{"name":"Barnskor","cube":"F10","floor":2}],"keywords":["skor","sko","stövlar","stövel","chelseaboots","boots","kängor","känga","sneakers","gympaskor","sandaler","sandal","tofflor","toffla","gummistövlar","vinterskor","finskor","pumps","loafers","ballerinaskor","träskor","barnskor"]},
+{"id":"damskor","name":"Damskor","floor":2,"level":"Plan 2","via":"I10","cube":"F10","audience":"dam","order":17,"sections":[{"name":"Damskor","cube":"F10","floor":2}],"keywords":["skor","sko","stövlar","stövel","chelseaboots","boots","kängor","känga","sneakers","gympaskor","sandaler","sandal","tofflor","toffla","gummistövlar","vinterskor","finskor","pumps","loafers","ballerinaskor","träskor","damskor"]},
+{"id":"herrskor","name":"Herrskor","floor":2,"level":"Plan 2","via":"I10","cube":"F10","audience":"herr","order":18,"sections":[{"name":"Herrskor","cube":"F10","floor":2}],"keywords":["skor","sko","stövlar","stövel","chelseaboots","boots","kängor","känga","sneakers","gympaskor","sandaler","sandal","tofflor","toffla","gummistövlar","vinterskor","finskor","pumps","loafers","ballerinaskor","träskor","herrskor"]},
+{"id":"skor","name":"Skor","floor":2,"level":"Plan 2","via":"I10","cube":"F10","audience":null,"order":19,"sections":[{"name":"Skovård","cube":"F10","floor":2}],"keywords":["skovård","skosnören","inlägg","skokräm","impregnering","skoborste","sulor"]},
+{"id":"sasongstorget","name":"Säsongstorget","floor":2,"level":"Plan 2","via":"I10","cube":"G10","audience":null,"order":20,"sections":[{"name":"CRAZY Christmas","cube":"G10","floor":2},{"name":"Jul","cube":"G10","floor":2}],"keywords":["säsong","säsongstorget","jul","julpynt","julgran","adventsljusstake","påsk","halloween","midsommar","crazy","christmas","jultorget","julpapper","julgranar","julbelysning","jultomte","jultomtar","jultextil","julinredning","julkalender","julkalendrar","utemöbler","trädgårdsmöbler","parasoll","dynor"]},
+{"id":"media","name":"Media","floor":1,"level":"Plan 1","via":null,"cube":"J9","audience":null,"order":21,"sections":[{"name":"Barnböcker","cube":"J9","floor":1},{"name":"Böcker","cube":"J10","floor":1},{"name":"Datortillbehör","cube":"G9","floor":1},{"name":"Film","cube":"G9","floor":1},{"name":"Foto","cube":"H9","floor":1},{"name":"LP-skivor","cube":"G8","floor":1},{"name":"Mobiltelefontillbehör","cube":"J8","floor":1},{"name":"Musik & Ljudböcker","cube":"J9","floor":1},{"name":"TV- & Datorspel","cube":"G8","floor":1}],"keywords":["media","barnböcker","böcker","bok","datortillbehör","film","dvd","foto","lp","vinyl","musik","ljudbok","tv-spel","datorspel","mobilskal","mus","tangentbord","lp-skivor","mobiltelefontillbehör","ljudböcker"]},
+{"id":"barnavdelningen","name":"Barnavdelningen","floor":2,"level":"Övre plan","via":"J2","cube":"J2","audience":"barn","order":22,"sections":[{"name":"Barnkläder","cube":"J2","floor":2},{"name":"Barnmode","cube":"J2","floor":2},{"name":"Underkläder - barn","cube":"J2","floor":2},{"name":"Ungdomskläder","cube":"J2","floor":2},{"name":"Ytterkläder - barn","cube":"J2","floor":2}],"keywords":["barn","barnkläder","barnmode","ungdom","ungdomskläder","barnjeans","pyjamas","overall","regnkläder","regnställ","mössa","vantar","vante","tröja","byxa","byxor","strumpor","strumpa","jacka","t-shirt","klänning","underkläder","ytterkläder"]},
+{"id":"friluftsliv","name":"Friluftsliv","floor":-1,"level":"Nedre plan","via":"J2","cube":"J2","audience":null,"order":23,"sections":[{"name":"Friluftsartiklar","cube":"J2","floor":-1},{"name":"Funktionskläder","cube":"J2","floor":-1},{"name":"Grill","cube":"J2","floor":-1},{"name":"Husvagnsartiklar","cube":"J5","floor":-1},{"name":"Jakt & Fiske","cube":"J2","floor":-1}],"keywords":["friluftsliv","friluftsartiklar","funktionskläder","grill","tält","sovsäck","termos","camping","husvagn","fiske","fiskespö","jakt","regnjacka","kolgrill","grillkol","tändvätska","husvagnsartiklar","grillar","grilltillbehör"]},
+{"id":"husdjur","name":"Husdjur","floor":-1,"level":"Nedre plan","via":"J2","cube":"J2","audience":null,"order":24,"sections":[{"name":"Djurmat","cube":"J2","floor":-1},{"name":"Djurtillbehör","cube":"J2","floor":-1},{"name":"Godis/treats för djur","cube":"J2","floor":-1},{"name":"Vitaminer & Mineraler","cube":"J2","floor":-1}],"keywords":["husdjur","djurmat","hundmat","kattmat","djurtillbehör","koppel","hundhalsband","kattsand","hund","katt","tuggben","godis","treats","djur","vitaminer","mineraler"]},
+{"id":"hastsport","name":"Hästsport","floor":-1,"level":"Nedre plan","via":"J2","cube":"J2","audience":null,"order":25,"sections":[{"name":"Bett & Grimmor & Ridutrustning","cube":"J2","floor":-1},{"name":"Ridkläder","cube":"J2","floor":-1},{"name":"Skötsel & Underhåll","cube":"J2","floor":-1},{"name":"Säkerhet & Skydd","cube":"J2","floor":-1},{"name":"Täcken & Schabrak","cube":"J2","floor":-1}],"keywords":["hästsport","häst","bett","grimma","grimmor","ridutrustning","ridkläder","ridbyxor","ridhjälm","schabrak","skötsel","underhåll","säkerhet","skydd","täcken","ridtillbehör","ryttare","hästtäcke"]},
+{"id":"verktyg-bilvard","name":"Verktyg & Bilvård","floor":-1,"level":"Nedre plan","via":"J2","cube":"J2","audience":null,"order":26,"sections":[{"name":"Arbetskläder","cube":"J2","floor":-1},{"name":"Biltillbehör","cube":"J2","floor":-1},{"name":"Elartiklar","cube":"J2","floor":-1},{"name":"Färg","cube":"J2","floor":-1},{"name":"Säkerhet","cube":"J2","floor":-1},{"name":"Verktyg","cube":"J2","floor":-1}],"keywords":["verktyg","bilvård","arbetskläder","biltillbehör","elartiklar","färg","pensel","skruvdragare","borr","skruv","hammare","spolarvätska","torkarblad","bilschampo","skyddsglasögon","arbetshandskar","säkerhet"]},
+{"id":"sport","name":"Sport","floor":1,"level":"Plan 1","via":null,"cube":"K9","audience":null,"order":27,"sections":[{"name":"Bollsport","cube":"K9","floor":1},{"name":"Cykel","cube":"K9","floor":1},{"name":"Fitness","cube":"K8","floor":1},{"name":"Golf","cube":"K8","floor":1},{"name":"Racketsport","cube":"K9","floor":1},{"name":"Sporttillbehör","cube":"K8","floor":1},{"name":"Sportväskor","cube":"K8","floor":1},{"name":"Streetsport","cube":"K9","floor":1},{"name":"Träningskläder","cube":"K3","floor":1}],"keywords":["sport","bollsport","boll","fotboll","cykel","cykelhjälm","fitness","golf","racket","padel","tennis","sporttillbehör","sportväska","streetsport","skateboard","träningskläder","yogamatta","hantlar","sportbh","badkläder","baddräkt","badbyxor","bikini","simglasögon","fotbollsstrumpor","racketsport","sportväskor","balanskudde","balansbräda","pilatesboll","gymboll","träningsband","vintersport","pulka","skridskor","sommarlek","badleksaker","vattenpistol","studsmatta"]}
+]
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var STORE = 'ullared-kassa-v2';
+  var STORE = 'ullared-kassa-v3', VERSION = 3;
   var state = { items: [], budget: 0 };
   var history = [];            // ögonblicksbilder för Ångra
   var qty = 1, editId = null;
   var video = $('video'), stream = null, worker = null, workerLoading = null, wakeLock = null, toastTimer = null;
 
-  /* ---------- Lagring (med flytt från v1) ---------- */
+  /* Standardavdelningar (inbakade från avdelningar.json) */
+  var DEFAULT_DEPTS = [];
+  try { DEFAULT_DEPTS = JSON.parse($('deptData').textContent) || []; } catch (e) {}
+  function defaultDepts() { return JSON.parse(JSON.stringify(DEFAULT_DEPTS)); }
+
+  /* ---------- Lagring: v3, med flytt från v2 och v1. Gamla nycklar ligger kvar som skydd. ---------- */
   try {
-    var raw = localStorage.getItem(STORE);
+    var raw = localStorage.getItem(STORE) || localStorage.getItem('ullared-kassa-v2');
     if (raw) state = JSON.parse(raw);
     else {
       var old = JSON.parse(localStorage.getItem('ullared-kassa-v1') || '[]');
       state.items = old.map(function (o) { return { id: uid(), name: '', price: o.price, qty: o.qty }; });
     }
   } catch (e) {}
-  if (!Array.isArray(state.wishes)) state.wishes = [];
-  if (typeof state.limit !== 'number') state.limit = 200;
+  state = upgrade(state);
+  try { if (!localStorage.getItem(STORE)) save(); } catch (e) {}
+
+  // Ger tillståndet alla fält som v3 behöver, med säkra standardvärden.
+  function upgrade(s) {
+    if (!s || typeof s !== 'object') s = {};
+    if (!Array.isArray(s.items)) s.items = [];
+    if (!Array.isArray(s.wishes)) s.wishes = [];
+    if (typeof s.budget !== 'number') s.budget = 0;
+    if (typeof s.limit !== 'number') s.limit = 200;
+    if (!Array.isArray(s.departments) || !s.departments.length) s.departments = defaultDepts();
+    else s.departments.forEach(function (d) {
+      // Standardavdelningar får alltid de senaste sökorden; egna avdelningar behåller sina.
+      var def = DEFAULT_DEPTS.find(function (x) { return x.id === d.id; });
+      if (def) d.keywords = def.keywords.slice();
+      if (!Array.isArray(d.keywords)) d.keywords = [];
+    });
+    if (!s.deptLearn || typeof s.deptLearn !== 'object' || Array.isArray(s.deptLearn)) s.deptLearn = {};
+    if (!s.view || typeof s.view !== 'object') s.view = {};
+    if (s.view.wishes !== 'person' && s.view.wishes !== 'dept') s.view.wishes = 'dept';
+    if (s.view.items !== 'recent' && s.view.items !== 'dept') s.view.items = 'recent';
+    s.items.forEach(function (i) { if (typeof i.dept !== 'string') i.dept = ''; });
+    s.wishes.forEach(function (w) { if (typeof w.dept !== 'string') w.dept = ''; });
+    s.version = VERSION;
+    return s;
+  }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -373,9 +506,25 @@
 
     var q = $('search').value.trim().toLowerCase();
     $('search').style.display = state.items.length > 6 ? 'block' : 'none';
-    var ul = $('list'); ul.innerHTML = '';
-    state.items.slice().reverse().forEach(function (it) {
-      if (q && (it.name || '').toLowerCase().indexOf(q) < 0 && String(it.price).indexOf(q) < 0) return;
+    var box = $('list'); box.innerHTML = '';
+    $('itemView').hidden = !state.items.length; syncSeg('itemView', state.view.items);
+    var shown = state.items.slice().reverse().filter(function (it) {
+      return !q || (it.name || '').toLowerCase().indexOf(q) >= 0 || String(it.price).indexOf(q) >= 0;
+    });
+    if (state.view.items === 'dept') {
+      groupByDept(shown).forEach(function (g) {
+        var n = g.list.reduce(function (s, i) { return s + i.qty; }, 0), sum2 = g.list.reduce(function (s, i) { return s + i.price * i.qty; }, 0);
+        box.appendChild(groupHead(g.dept ? g.dept.name : 'Övrigt', n + ' st · ' + fmt(sum2), deptWhere(g.dept)));
+        var ul2 = document.createElement('ul'); g.list.forEach(function (it) { ul2.appendChild(itemRow(it)); }); box.appendChild(ul2);
+      });
+    } else {
+      var ul = document.createElement('ul'); shown.forEach(function (it) { ul.appendChild(itemRow(it)); }); box.appendChild(ul);
+    }
+    $('empty').style.display = state.items.length ? 'none' : 'block';
+    $('clearBtn').style.display = state.items.length ? 'inline-block' : 'none';
+    $('shareBtn').style.display = state.items.length ? 'inline-block' : 'none';
+  }
+  function itemRow(it) {
       var li = document.createElement('li'); li.className = 'item';
       li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>' +
         '<div class="acts"><button aria-label="Minska antal">−</button><span class="n"></span>' +
@@ -395,11 +544,10 @@
       b[1].onclick = function () { snap('ökade ' + label(it)); it.qty++; save(); render(); };
       b[2].onclick = function () { openEdit(it.id); };
       li.querySelector('.name').onclick = function () { openEdit(it.id); };
-      ul.appendChild(li);
-    });
-    $('empty').style.display = state.items.length ? 'none' : 'block';
-    $('clearBtn').style.display = state.items.length ? 'inline-block' : 'none';
-    $('shareBtn').style.display = state.items.length ? 'inline-block' : 'none';
+      var acts = li.querySelector('.acts');
+      acts.appendChild(deptChip(it, label(it)));
+      acts.appendChild(b[2]);   // Ändra längst till höger
+      return li;
   }
   $('search').oninput = render;
 
@@ -415,12 +563,17 @@
     var name = $('name').value.trim();
     snap('la till ' + (name || fmt(p)));
     var ex = state.items.find(function (i) { return i.price === p && (i.name || '').toLowerCase() === name.toLowerCase(); });
-    var img = safeUrl($('img').value);
-    if (ex) { ex.qty = Math.min(99, ex.qty + qty); if (img && !ex.img) ex.img = img; }
-    else state.items.push({ id: uid(), name: name, price: p, qty: qty, img: img });
-    if (linked) { var lw = findWish(linked); if (lw) lw.done = true; setLink(null); }
+    var img = safeUrl($('img').value), lw = linked ? findWish(linked) : null, dept = '';
+    if (ex) { ex.qty = Math.min(99, ex.qty + qty); if (img && !ex.img) ex.img = img; dept = ex.dept; }
+    else {
+      // Köpt från listan: samma avdelning som önskningen. Annars gissar appen utifrån namnet.
+      dept = lw && lw.dept ? lw.dept : guessDept(name);
+      state.items.push({ id: uid(), name: name, price: p, qty: qty, img: img, dept: dept });
+    }
+    if (linked) { if (lw) lw.done = true; setLink(null); }
     save(); render();
-    toast('Tillagd: ' + (name ? name + ', ' : '') + qty + ' × ' + fmt(p), true);
+    var dd = deptById(dept);
+    toast('Tillagd: ' + (name ? name + ', ' : '') + qty + ' × ' + fmt(p) + (dd ? ' · ' + dd.name : ''), true);
     $('price').value = ''; $('img').value = ''; updateHint(); $('name').value = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
     if (navigator.vibrate) navigator.vibrate(30);
   }
@@ -432,6 +585,7 @@
   function openEdit(id) {
     var it = find(id); if (!it) return; editId = id;
     $('eImg').value = it.img || ''; $('eName').value = it.name; $('ePrice').value = String(it.price).replace('.', ','); $('eQty').value = it.qty;
+    fillDeptSelect($('eDept'), it.dept);
     $('editDlg').showModal();
   }
   $('eCancel').onclick = function () { $('editDlg').close(); };
@@ -441,6 +595,8 @@
     if (!(p > 0) || !(n > 0)) return;
     snap('ändrade ' + label(it));
     it.name = $('eName').value.trim(); it.img = safeUrl($('eImg').value); it.price = p; it.qty = Math.min(99, n);
+    var nd = $('eDept').value;
+    if (nd !== (it.dept || '')) { it.dept = nd; learnDept(it.name, nd); }
     save(); render(); toast('Sparade ändringen', true);
   };
   $('eDelete').onclick = function () {
@@ -584,6 +740,224 @@
   }
   $('price').addEventListener('input', updateHint);
 
+  /* ================= Avdelningar ================= */
+  // Ord som styr mot dam/herr/barn/baby men inte pekar ut en avdelning på egen hand.
+  var AUDIENCE = { dam: 'dam', damer: 'dam', kvinna: 'dam', tjej: 'dam', tjejer: 'dam', herr: 'herr', herrar: 'herr', man: 'herr', kille: 'herr', killar: 'herr',
+    barn: 'barn', junior: 'barn', ungdom: 'barn', kids: 'barn', pojke: 'barn', flicka: 'barn', baby: 'baby', bebis: 'baby' };
+  var AUD_PREFIX = ['dam', 'herr', 'barn', 'baby', 'bebis'];
+  var STOPWORDS = { och: 1, till: 1, for: 1, 'för': 1, med: 1, den: 1, det: 1, en: 1, ett: 1, st: 1, stl: 1, storlek: 1, ny: 1, nya: 1 };
+
+  function deptById(id) { return id ? state.departments.find(function (d) { return d.id === id; }) : null; }
+  function sortedDepts() { return state.departments.slice().sort(function (a, b) { return a.order - b.order; }); }
+  function renumber(list) { list.forEach(function (d, i) { d.order = i + 1; }); }
+  function deptWhere(d) {
+    if (!d || !d.level) return '';
+    var via = d.via ? (d.level === 'Plan 2' ? ' (rulltrappa vid ' + d.via + ')' : ' (trappa vid ' + d.via + ')') : '';
+    return d.level + via + (d.cube ? ' · takkub ' + d.cube : '');
+  }
+
+  function words(text) {
+    return String(text || '').toLowerCase().replace(/[^a-zåäöéüæø0-9\s-]/g, ' ').split(/[\s-]+/).filter(Boolean);
+  }
+  // Enkel svensk plural/bestämd form: stövlar → stövl/stövel, byxor → byx, kuddar → kudd
+  function stems(w) {
+    var out = [w];
+    ['orna', 'arna', 'erna', 'or', 'ar', 'er', 'en', 'et', 'na', 'a', 'r', 'n'].forEach(function (suf) {
+      if (w.length - suf.length >= 3 && w.slice(-suf.length) === suf) out.push(w.slice(0, -suf.length));
+    });
+    var last = out[out.length - 1];
+    if (/[^aeiouyåäö]l$/.test(last)) out.push(last.slice(0, -1) + 'el');
+    return out;
+  }
+  function wordScore(tok, kw) {
+    if (tok === kw) return 3;
+    var ts = stems(tok), ks = stems(kw), i, j;
+    for (i = 0; i < ts.length; i++) if (ks.indexOf(ts[i]) >= 0) return 3;
+    // Sammansatta ord avgörs av sista delen: vinterstövlar → stövlar, barnstrumpor → strumpor
+    if (kw.length >= 4) for (i = 0; i < ks.length; i++) for (j = 0; j < ts.length; j++)
+      if (ts[j].length > ks[i].length && ts[j].slice(-ks[i].length) === ks[i]) return 2;
+    return 0;
+  }
+  function audienceOf(toks) {
+    var aud = {};
+    toks.forEach(function (t) {
+      if (AUDIENCE[t]) aud[AUDIENCE[t]] = 1;
+      AUD_PREFIX.forEach(function (p) { if (t.length > p.length + 3 && t.indexOf(p) === 0) aud[AUDIENCE[p]] = 1; });
+    });
+    return aud;
+  }
+  // Huvudordet i en text: sista ordet som inte är dam/herr/barn eller ett fyllnadsord ("chelsea stövlar dam" → stövlar)
+  function headWord(toks) {
+    for (var i = toks.length - 1; i >= 0; i--) {
+      var t = toks[i];
+      if (t.length >= 3 && !AUDIENCE[t] && !STOPWORDS[t] && !/^\d+$/.test(t)) return t;
+    }
+    return '';
+  }
+  // Gissar avdelning: först det appen lärt sig, sedan sökorden. Returnerar id eller ''.
+  function guessDept(text) {
+    var toks = words(text); if (!toks.length) return '';
+    var phrase = toks.join(' '), learn = state.deptLearn;
+    if (Object.prototype.hasOwnProperty.call(learn, phrase) && (learn[phrase] === '' || deptById(learn[phrase]))) return learn[phrase];
+    var aud = audienceOf(toks), hasAud = Object.keys(aud).length > 0, pairs = [], best = null;
+    for (var i = 0; i < toks.length - 1; i++) pairs.push(toks[i] + toks[i + 1]);   // "balans kudde" → "balanskudde"
+    state.departments.forEach(function (d) {
+      var score = 0, kws = d.keywords || [];
+      toks.forEach(function (t) {
+        if (learn[t] === d.id) score += 5;
+        if (AUDIENCE[t]) return;
+        var m = 0; kws.forEach(function (k) { var s = wordScore(t, k); if (s > m) m = s; }); score += m;
+      });
+      pairs.forEach(function (p) { if (kws.some(function (k) { return wordScore(p, k) === 3; })) score += 4; });
+      if (!score) return;
+      if (d.audience && aud[d.audience]) score += 2;
+      if (d.audience && hasAud && !aud[d.audience]) score -= 2;
+      if (score > 0 && (!best || score > best.score || (score === best.score && d.order < best.d.order))) best = { d: d, score: score };
+    });
+    return best ? best.d.id : '';
+  }
+  // Kommer ihåg ett byte: hela texten och huvudordet.
+  function learnDept(text, id) {
+    var toks = words(text); if (!toks.length) return;
+    state.deptLearn[toks.join(' ')] = id;
+    var h = headWord(toks);
+    if (h) { if (id) state.deptLearn[h] = id; else delete state.deptLearn[h]; }
+  }
+
+  function fillDeptSelect(sel, current) {
+    sel.innerHTML = '';
+    var o = document.createElement('option'); o.value = ''; o.textContent = 'Ingen (Övrigt)'; sel.appendChild(o);
+    sortedDepts().forEach(function (d) {
+      var op = document.createElement('option'); op.value = d.id; op.textContent = d.name; sel.appendChild(op);
+    });
+    sel.value = deptById(current) ? current : '';
+  }
+  function deptChip(obj, text) {
+    var d = deptById(obj.dept), b = document.createElement('button');
+    b.type = 'button'; b.className = 'deptchip' + (d ? '' : ' none');
+    var pill = document.createElement('span'); pill.textContent = d ? d.name : 'Välj avdelning'; b.appendChild(pill);
+    b.setAttribute('aria-label', (d ? 'Avdelning: ' + d.name : 'Ingen avdelning') + '. Byt avdelning för ' + text);
+    b.onclick = function () { openDeptPicker(obj, text); };
+    return b;
+  }
+  // Byter avdelning på en vara eller önskning, med ångra och inlärning.
+  function setDept(obj, id, text) {
+    if ((obj.dept || '') === id) return;
+    var d = deptById(id);
+    snap('bytte avdelning för ' + text);
+    obj.dept = id; learnDept(obj.name || obj.text || '', id);
+    save(); render(); toast(text + ' → ' + (d ? d.name : 'Övrigt'), true);
+  }
+  var pickTarget = null;
+  function openDeptPicker(obj, text) {
+    pickTarget = { obj: obj, text: text };
+    $('deptDlgFor').textContent = text;
+    var box = $('deptPick'); box.innerHTML = '';
+    sortedDepts().concat([null]).forEach(function (d) {
+      var b = document.createElement('button'); b.type = 'button';
+      var id = d ? d.id : '', cur = (obj.dept || '') === id || (!d && !deptById(obj.dept));
+      var t = document.createElement('b'); t.textContent = d ? d.name : 'Ingen avdelning (Övrigt)'; b.appendChild(t);
+      if (d && deptWhere(d)) { var s = document.createElement('span'); s.textContent = deptWhere(d); b.appendChild(s); }
+      b.setAttribute('aria-current', String(cur));
+      b.onclick = function () { $('deptDlg').close(); setDept(pickTarget.obj, id, pickTarget.text); pickTarget = null; };
+      box.appendChild(b);
+    });
+    $('deptDlg').showModal();
+    var curBtn = box.querySelector('[aria-current=true]'); if (curBtn) curBtn.scrollIntoView({ block: 'center' });
+  }
+  $('deptDlgCancel').onclick = function () { $('deptDlg').close(); };
+
+  // Delar upp en lista i avdelningar i vandringsordning; det utan avdelning hamnar sist under Övrigt.
+  function groupByDept(list) {
+    var groups = {}, out = [];
+    list.forEach(function (x) { var k = deptById(x.dept) ? x.dept : ''; (groups[k] = groups[k] || []).push(x); });
+    sortedDepts().forEach(function (d) { if (groups[d.id]) out.push({ dept: d, list: groups[d.id] }); });
+    if (groups['']) out.push({ dept: null, list: groups[''] });
+    return out;
+  }
+  function groupHead(title, right, where) {
+    var g = document.createElement('div'); g.className = 'grouphead';
+    var h = document.createElement('h3'); h.textContent = title;
+    var sm = document.createElement('small'); sm.textContent = right; h.appendChild(sm); g.appendChild(h);
+    if (where) { var w = document.createElement('div'); w.className = 'where'; w.textContent = where; g.appendChild(w); }
+    return g;
+  }
+  function setupSeg(id, key) {
+    var seg = $(id);
+    Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+      b.onclick = function () { state.view[key] = b.getAttribute('data-view'); save(); render(); };
+    });
+  }
+  function syncSeg(id, value) {
+    Array.prototype.forEach.call($(id).querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-view') === value));
+    });
+  }
+  setupSeg('itemView', 'items'); setupSeg('wishView', 'wishes');
+
+  /* Inställning: ordning, namn, egna avdelningar, återställ */
+  function renderDeptSettings() {
+    var list = sortedDepts(), box = $('deptSetList'); box.innerHTML = '';
+    list.forEach(function (d, i) {
+      var row = document.createElement('div'); row.className = 'deptrow';
+      var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
+      up.setAttribute('aria-label', 'Flytta upp ' + d.name);
+      var dn = document.createElement('button'); dn.type = 'button'; dn.textContent = '↓'; dn.disabled = i === list.length - 1;
+      dn.setAttribute('aria-label', 'Flytta ner ' + d.name);
+      var inp = document.createElement('input'); inp.type = 'text'; inp.value = d.name; inp.autocomplete = 'off';
+      inp.setAttribute('aria-label', 'Namn på avdelning ' + (i + 1));
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.textContent = '✕';
+      del.setAttribute('aria-label', 'Ta bort ' + d.name);
+      function move(dir) {
+        snap('flyttade ' + d.name);
+        var l = sortedDepts(), j = l.indexOf(d), t = l[j + dir]; l[j + dir] = d; l[j] = t; renumber(l);
+        save(); render(); renderDeptSettings();
+        var again = $('deptSetList').querySelectorAll('.deptrow')[j + dir];
+        if (again) again.querySelectorAll('button')[dir < 0 ? 0 : 1].focus();
+      }
+      up.onclick = function () { move(-1); };
+      dn.onclick = function () { move(1); };
+      inp.onchange = function () {
+        var v = inp.value.trim(); if (!v) { inp.value = d.name; return; }
+        if (v === d.name) return;
+        snap('bytte namn på ' + d.name); d.name = v; save(); render();
+      };
+      del.onclick = function () {
+        var used = state.items.filter(function (x) { return x.dept === d.id; }).length + state.wishes.filter(function (x) { return x.dept === d.id; }).length;
+        if (!confirm('Ta bort ' + d.name + '?' + (used ? ' ' + used + ' saker flyttas till Övrigt.' : '') + ' Du kan ångra.')) return;
+        snap('tog bort avdelningen ' + d.name);
+        state.departments = state.departments.filter(function (x) { return x !== d; }); renumber(sortedDepts());
+        state.items.concat(state.wishes).forEach(function (x) { if (x.dept === d.id) x.dept = ''; });
+        save(); render(); renderDeptSettings();
+      };
+      row.appendChild(up); row.appendChild(dn); row.appendChild(inp); row.appendChild(del);
+      box.appendChild(row);
+    });
+    $('deptSetUndo').disabled = !history.length;
+  }
+  function openDeptSettings() { renderDeptSettings(); $('deptSetDlg').showModal(); }
+  $('deptSettingsBtn').onclick = openDeptSettings;
+  $('deptSettingsBtn2').onclick = openDeptSettings;
+  $('deptSetClose').onclick = function () { $('deptSetDlg').close(); };
+  $('deptSetUndo').onclick = function () { undo(); renderDeptSettings(); };
+  function addCustomDept() {
+    var n = $('deptNewName').value.trim(); if (!n) { $('deptNewName').focus(); return; }
+    snap('lade till avdelningen ' + n);
+    state.departments.push({ id: 'egen-' + uid(), name: n, floor: null, level: '', via: null, cube: '', audience: null,
+      order: state.departments.length + 1, keywords: [], custom: true });
+    $('deptNewName').value = ''; save(); render(); renderDeptSettings();
+    var s = $('deptSetList'); s.scrollTop = s.scrollHeight;
+  }
+  $('deptNewAdd').onclick = addCustomDept;
+  $('deptNewName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addCustomDept(); } });
+  $('deptSetReset').onclick = function () {
+    if (!confirm('Återställa avdelningarna till standard? Egna avdelningar och ändrad ordning försvinner. Du kan ångra.')) return;
+    snap('återställde avdelningarna');
+    state.departments = defaultDepts();
+    state.items.concat(state.wishes).forEach(function (x) { if (x.dept && !deptById(x.dept)) x.dept = ''; });
+    save(); render(); renderDeptSettings();
+  };
+
   /* ================= Att köpa (önskelista) ================= */
   var linked = null, wishFilter = '';
 
@@ -634,23 +1008,25 @@
       });
     }
 
-    var hide = $('hideDone').checked, groups = {}, order = ppl.slice();
-    ws.forEach(function (w) {
-      if (hide && w.done) return;
-      if (wishFilter && w.person !== wishFilter) return;
-      var key = w.person || 'Övrigt';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(w);
-    });
-    if (order.indexOf('Övrigt') < 0) order.push('Övrigt');
+    var hide = $('hideDone').checked, byDept = state.view.wishes === 'dept';
+    $('wishView').hidden = !ws.length; syncSeg('wishView', state.view.wishes);
+    var shown = ws.filter(function (w) { return !(hide && w.done) && !(wishFilter && w.person !== wishFilter); });
+    var sections = [];
+    if (byDept) {
+      groupByDept(shown).forEach(function (g) { sections.push({ title: g.dept ? g.dept.name : 'Övrigt', where: deptWhere(g.dept), list: g.list }); });
+    } else {
+      var groups = {}, order = ppl.slice();
+      shown.forEach(function (w) { var key = w.person || 'Övrigt'; (groups[key] = groups[key] || []).push(w); });
+      if (order.indexOf('Övrigt') < 0) order.push('Övrigt');
+      order.forEach(function (key) { if (groups[key]) sections.push({ title: key, where: '', list: groups[key] }); });
+    }
     var box = $('wishes'); box.innerHTML = '';
-    order.forEach(function (key) {
-      var arr = groups[key]; if (!arr) return;
+    sections.forEach(function (s) {
+      var arr = s.list;
       arr.sort(function (a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); });
       var sec = document.createElement('div'); sec.className = 'wishgroup';
-      var h = document.createElement('h3'), left2 = arr.filter(function (w) { return !w.done; }).length;
-      h.textContent = key; var sm = document.createElement('small'); sm.textContent = left2 + ' kvar'; h.appendChild(sm);
-      sec.appendChild(h);
+      var left2 = arr.filter(function (w) { return !w.done; }).length;
+      sec.appendChild(groupHead(s.title, left2 + ' kvar', s.where));
       arr.forEach(function (w) {
         var row = document.createElement('div'); row.className = 'wish' + (w.done ? ' done' : '');
         var chk = document.createElement('button'); chk.className = 'check'; chk.setAttribute('role', 'checkbox');
@@ -664,7 +1040,11 @@
         txt.onclick = function () { openWish(w.id); };
         var wrap = document.createElement('div'); wrap.className = 'wtxt';
         if (w.img) wrap.appendChild(makeThumb(w.img));
-        wrap.appendChild(txt);
+        var col = document.createElement('div'); col.className = 'wcol'; col.appendChild(txt);
+        var meta = document.createElement('div'); meta.className = 'wmeta';
+        meta.appendChild(deptChip(w, w.text));
+        if (byDept && w.person) { var who = document.createElement('span'); who.className = 'who'; who.textContent = w.person; meta.appendChild(who); }
+        col.appendChild(meta); wrap.appendChild(col);
         row.appendChild(chk); row.appendChild(wrap);
         if (!w.done) {
           var buy = document.createElement('button'); buy.className = 'buy'; buy.textContent = 'Köp';
@@ -689,8 +1069,9 @@
     var t = $('wText').value.trim(); if (!t) { $('wText').focus(); return; }
     var person = $('wPerson').value.trim(), wimg = safeUrl($('wImg').value);
     snap('la till i listan: ' + t);
-    state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg });
-    save(); render(); toast('Tillagd i listan: ' + t, true);
+    var dept = guessDept(t), dd = deptById(dept);
+    state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg, dept: dept });
+    save(); render(); toast('Tillagd: ' + t + ' · ' + (dd ? dd.name : 'Övrigt'), true);
     $('wText').value = ''; $('wImg').value = ''; $('wText').focus();
   }
   $('wAdd').onclick = addWish;
@@ -700,12 +1081,15 @@
   var editWish = null;
   function openWish(id) {
     var w = findWish(id); if (!w) return; editWish = id;
-    $('wEditText').value = w.text; $('wEditPerson').value = w.person; $('wEditImg').value = w.img || ''; $('wishDlg').showModal();
+    $('wEditText').value = w.text; $('wEditPerson').value = w.person; $('wEditImg').value = w.img || '';
+    fillDeptSelect($('wEditDept'), w.dept); $('wishDlg').showModal();
   }
   $('wEditCancel').onclick = function () { $('wishDlg').close(); };
   $('wishForm').onsubmit = function () {
     var w = findWish(editWish), t = $('wEditText').value.trim(); if (!w || !t) return;
     snap('ändrade ' + w.text); w.text = t; w.person = $('wEditPerson').value.trim(); w.img = safeUrl($('wEditImg').value);
+    var nd = $('wEditDept').value;
+    if (nd !== (w.dept || '')) { w.dept = nd; learnDept(w.text, nd); }
     save(); render(); toast('Sparade ändringen', true);
   };
   $('wEditDelete').onclick = function () {
@@ -728,7 +1112,7 @@
       line = line.replace(/^[-*•·\u2022]+\s*/, '').replace(/^\d+[.)]\s+/, '').trim();
       var um = line.match(/\s*(\S+\.\S+)\s*$/), url = '';
       if (um && safeUrl(um[1]) && /^(https?:\/\/|www\.)/i.test(um[1])) { url = safeUrl(um[1]); line = line.slice(0, um.index).trim(); }
-      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url }); n++; }
+      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: guessDept(line) }); n++; }
     });
     if (!n) return;
     snap('la till ' + n + ' i listan');
@@ -737,12 +1121,20 @@
 
   /* Dela / ta bort klara */
   $('wShare').onclick = function () {
-    var lines = [], ppl = people().concat(['']);
-    ppl.forEach(function (p) {
+    var lines = [], ppl = people().concat(['']), line = function (w, who) {
+      return (w.done ? '[x] ' : '[ ] ') + w.text + (who && w.person ? ' (' + w.person + ')' : '') + (w.img ? ' ' + w.img : '');
+    };
+    if (state.view.wishes === 'dept') {
+      groupByDept(state.wishes).forEach(function (g) {
+        lines.push((g.dept ? g.dept.name + (g.dept.cube ? ' (' + g.dept.cube + ')' : '') : 'Övrigt') + ':');
+        g.list.forEach(function (w) { lines.push(line(w, true)); });
+        lines.push('');
+      });
+    } else ppl.forEach(function (p) {
       var arr = state.wishes.filter(function (w) { return (w.person || '') === p; });
       if (!arr.length) return;
       lines.push((p || 'Övrigt') + ':');
-      arr.forEach(function (w) { lines.push((w.done ? '[x] ' : '[ ] ') + w.text + (w.img ? ' ' + w.img : '')); });
+      arr.forEach(function (w) { lines.push(line(w, false)); });
       lines.push('');
     });
     var text = lines.join('\n').trim();
