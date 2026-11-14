@@ -386,7 +386,7 @@
       li.querySelector('.n').textContent = it.qty + ' st';
       if (it.img) { var inf = li.querySelector('.info'); inf.insertBefore(makeThumb(it.img), inf.firstChild); }
       if (state.limit > 0 && it.price < state.limit) { var bd = li.querySelector('.badge'); bd.hidden = false; bd.textContent = 'Under ' + fmt(state.limit); }
-      var b = li.querySelectorAll('button');
+      var b = li.querySelectorAll('.acts button');   // − + Ändra (inte namnknappen)
       b[0].onclick = function () { // −
         if (it.qty > 1) { snap('minskade ' + label(it)); it.qty--; toast(label(it) + ': ' + it.qty + ' st', true); }
         else { snap('tog bort ' + label(it)); state.items = state.items.filter(function (x) { return x !== it; }); toast('Tog bort ' + label(it), true); }
