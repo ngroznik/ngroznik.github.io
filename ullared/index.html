@@ -120,9 +120,6 @@
   .meta { min-width:0; }
   .thumb { width:44px; height:44px; border-radius:var(--radius-s); object-fit:cover; background:var(--surface-2); flex:none; display:block; }
   .thumblink { font-size:12px; color:var(--accent); text-decoration:underline; display:flex; align-items:center; min-height:44px; flex:none; }
-  .badge { display:inline-block; background:var(--green); color:#0f2a1c; border-radius:999px; font-size:12px; font-weight:700; padding:2px 10px; margin-top:4px; }
-  .pricehint { margin-top:8px; font-weight:600; font-size:14px; min-height:20px; color:var(--muted); }
-  .pricehint.low { color:var(--green); }
   .wtxt { display:flex; align-items:center; gap:12px; min-width:0; }
 
   /* Flikar: Skanna / Att köpa */
@@ -308,7 +305,6 @@
         </div>
       </div>
     </div>
-    <div class="pricehint" id="priceHint" aria-live="polite"></div>
     <div class="row"><button class="btn red" id="addBtn">Lägg i korgen</button></div>
   </div>
   </details>
@@ -328,7 +324,7 @@
   <div class="empty" id="empty">Inget i korgen än.</div>
 
   <div class="tools">
-    <button class="linkbtn neutral" id="budgetBtn">Budget &amp; prisgräns</button>
+    <button class="linkbtn neutral" id="budgetBtn">Budget</button>
     <button class="linkbtn neutral" id="shareBtn">Dela / kopiera lista</button>
     <button class="linkbtn neutral" id="deptSettingsBtn">Avdelningar</button>
     <button class="linkbtn neutral" id="backupBtn">Backup</button>
@@ -416,8 +412,6 @@
   <form method="dialog" id="budgetForm">
     <label for="bInput">Din budget (kr). Lämna tomt för ingen budget.</label>
     <input type="text" class="big" id="bInput" inputmode="decimal" autocomplete="off">
-    <label for="bLimit" style="margin-top:12px">Märk varor som kostar under (kr). Lämna tomt för ingen märkning.</label>
-    <input type="text" class="big" id="bLimit" inputmode="decimal" autocomplete="off">
     <div class="row">
       <button type="button" class="btn" id="bCancel">Avbryt</button>
       <button type="submit" class="btn primary">Spara</button>
@@ -583,7 +577,7 @@
     if (!Array.isArray(s.items)) s.items = [];
     if (!Array.isArray(s.wishes)) s.wishes = [];
     if (typeof s.budget !== 'number') s.budget = 0;
-    if (typeof s.limit !== 'number') s.limit = 200;
+    delete s.limit;   // prisgränsen ("Under 200 kr") är borttagen
     if (!Array.isArray(s.departments) || !s.departments.length) s.departments = defaultDepts();
     else s.departments.forEach(function (d) {
       // Standardavdelningar får alltid de senaste sökorden; egna avdelningar behåller sina.
@@ -722,7 +716,6 @@
     renderWishes();
     renderVisit();
     $('backupTip').hidden = !(state.items.length > 10 && (!state.lastExport || Date.now() - state.lastExport > 24 * 3600 * 1000));
-    updateHint();
 
     var bl = $('budgetLine'), bar = $('bar');
     if (state.budget > 0) {
@@ -758,13 +751,12 @@
   function itemRow(it) {
       var li = document.createElement('li'); li.className = 'item';
       // Antal och borttagning görs i ändra-rutan: tryck på namnet.
-      li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>';
+      li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div></div></div><div class="line"></div>';
       li.querySelector('.name').textContent = it.name || 'Namnlös vara';
       li.querySelector('.name').setAttribute('aria-label', 'Ändra ' + (it.name || 'namnlös vara') + ', ' + it.qty + ' st, ' + fmt(it.price * it.qty));
       li.querySelector('.calc').textContent = it.qty + ' × ' + fmt(it.price);
       li.querySelector('.line').textContent = fmt(it.price * it.qty);
       if (it.img) { var inf = li.querySelector('.info'); inf.insertBefore(makeThumb(it.img), inf.firstChild); }
-      if (state.limit > 0 && it.price < state.limit) { var bd = li.querySelector('.badge'); bd.hidden = false; bd.textContent = 'Under ' + fmt(state.limit); }
       li.querySelector('.name').onclick = function () { openEdit(it.id); };
       // Avdelningen syns i rubriken när korgen visas per avdelning; annars som en tagg på raden.
       if (state.view.items !== 'dept') {
@@ -798,7 +790,7 @@
     save(); render();
     var dd = deptById(dept);
     toast('Tillagd: ' + (name ? name + ', ' : '') + qty + ' × ' + fmt(p) + (dd ? ' · ' + dd.name : ''), true);
-    $('price').value = ''; $('img').value = ''; updateHint(); $('name').value = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
+    $('price').value = ''; $('img').value = ''; $('name').value = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
     if (navigator.vibrate) navigator.vibrate(30);
   }
   $('addBtn').onclick = add;
@@ -834,12 +826,11 @@
   };
 
   /* ---------- Budget ---------- */
-  $('budgetBtn').onclick = function () { $('bInput').value = state.budget ? String(state.budget).replace('.', ',') : ''; $('bLimit').value = state.limit ? String(state.limit).replace('.', ',') : ''; $('budgetDlg').showModal(); };
+  $('budgetBtn').onclick = function () { $('bInput').value = state.budget ? String(state.budget).replace('.', ',') : ''; $('budgetDlg').showModal(); };
   $('bCancel').onclick = function () { $('budgetDlg').close(); };
   $('budgetForm').onsubmit = function () {
     var v = $('bInput').value.trim(); var p = v ? parsePrice(v) : 0;
     state.budget = p > 0 ? p : 0;
-    var lv = $('bLimit').value.trim(), lp = lv ? parsePrice(lv) : 0; state.limit = lp > 0 ? lp : 0;
     save(); render();
   };
 
@@ -1025,11 +1016,10 @@
     if (!prices.length) { setStatus('Hittade inget pris. Försök igen närmare, eller skriv in det själv.'); return; }
     prices.slice(0, 4).forEach(function (p) {
       var b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.textContent = String(p).replace('.', ',');
-      b.onclick = function () { $('price').value = String(p).replace('.', ','); updateHint(); };
+      b.onclick = function () { $('price').value = String(p).replace('.', ','); };
       chips.appendChild(b);
     });
     $('price').value = String(prices[0]).replace('.', ',');
-    updateHint();
     setStatus(prices.length > 1 ? 'Flera siffror hittades – välj rätt pris ovan.' : 'Kontrollera att priset stämmer.');
     $('name').focus({ preventScroll: true });
   }
@@ -1110,13 +1100,6 @@
     im.onerror = function () { a.textContent = 'Öppna länk'; a.className = 'thumblink'; };
     a.appendChild(im); return a;
   }
-  function updateHint() {
-    var h = $('priceHint'), p = parsePrice($('price').value);
-    if (!(p > 0) || !(state.limit > 0)) { h.textContent = ''; h.className = 'pricehint'; return; }
-    if (p < state.limit) { h.textContent = '✓ Under ' + fmt(state.limit); h.className = 'pricehint low'; }
-    else { h.textContent = fmt(state.limit) + ' eller mer'; h.className = 'pricehint'; }
-  }
-  $('price').addEventListener('input', updateHint);
 
   /* ================= Avdelningar ================= */
   // Ord som styr mot dam/herr/barn/baby men inte pekar ut en avdelning på egen hand.
@@ -1561,7 +1544,7 @@
   }
   function backupData() {
     return { app: APP_ID, version: VERSION, exportedAt: new Date().toISOString(),
-      items: state.items, wishes: state.wishes, budget: state.budget, limit: state.limit,
+      items: state.items, wishes: state.wishes, budget: state.budget,
       departments: compactDepts(state.departments), deptFormat: 'diff', deptLearn: state.deptLearn,
       visit: state.visit, view: state.view, lastExport: state.lastExport };
   }
@@ -1598,7 +1581,7 @@
       return { id: uniqueId(w.id, seen), text: str(w.text, 300), person: str(w.person, 60), done: w.done === true,
         img: safeUrl(w.img), dept: str(w.dept, 80), max: mx };
     });
-    ['budget', 'limit'].forEach(function (k) {
+    ['budget'].forEach(function (k) {   // äldre backuper kan ha "limit"; den ignoreras
       if (o[k] === undefined) return;
       var v = num(o[k]); if (!(v >= 0 && v < 10000000)) fail((k === 'budget' ? 'Budgeten' : 'Prisgränsen') + ' är inte ett giltigt belopp.');
       s[k] = v;
