@@ -290,7 +290,7 @@
     <div class="chips" id="chips" aria-label="Förslag på pris"></div>
     <label for="name">Vad är det? (valfritt)</label>
     <input type="text" id="name" placeholder="t.ex. Barnjeans, röd" autocomplete="off" enterkeyhint="next">
-    <div class="labelrow"><label for="dept">Avdelning (valfritt)</label></div>
+    <div class="labelrow"><label for="dept">Avdelning (valfritt)</label><button type="button" class="maplink" id="deptMap" hidden>Visa på kartan</button></div>
     <select id="dept"></select>
     <label for="img" style="margin-top:10px">Bild- eller produktlänk (valfritt)</label>
     <input type="text" id="img" inputmode="url" placeholder="https://…" autocomplete="off" style="font-size:16px">
@@ -329,6 +329,7 @@
   <div class="tools">
     <button class="linkbtn neutral" id="budgetBtn">Budget</button>
     <button class="linkbtn neutral" id="shareBtn">Dela / kopiera lista</button>
+    <button class="linkbtn neutral" id="mapBtn">Karta</button>
     <button class="linkbtn neutral" id="deptSettingsBtn">Avdelningar</button>
     <button class="linkbtn neutral" id="backupBtn">Backup</button>
     <button class="linkbtn" id="clearBtn">Töm korgen</button>
@@ -346,7 +347,7 @@
       <input type="text" id="wText" placeholder="t.ex. Vinterskor stl 34" autocomplete="off" enterkeyhint="done">
     </div>
     <div>
-      <div class="labelrow"><label for="wDept">Avdelning (valfritt)</label></div>
+      <div class="labelrow"><label for="wDept">Avdelning (valfritt)</label><button type="button" class="maplink" id="wDeptMap" hidden>Visa på kartan</button></div>
       <select id="wDept"></select>
     </div>
     <div>
@@ -380,6 +381,7 @@
   <div class="empty" id="wishEmpty">Listan är tom. Lägg till önskningar ovan.</div>
   <div class="tools">
     <button class="linkbtn neutral" id="wShare">Dela listan</button>
+    <button class="linkbtn neutral" id="mapBtn2">Karta</button>
     <button class="linkbtn neutral" id="deptSettingsBtn2">Avdelningar</button>
     <button class="linkbtn neutral" id="backupBtn2">Backup</button>
     <button class="linkbtn" id="wClearDone">Ta bort klara</button>
@@ -395,7 +397,7 @@
     <input type="text" id="eName" autocomplete="off">
     <label for="eImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="eImg" inputmode="url" autocomplete="off" style="font-size:16px">
-    <div class="labelrow" style="margin-top:10px"><label for="eDept">Avdelning</label></div>
+    <div class="labelrow" style="margin-top:10px"><label for="eDept">Avdelning</label><button type="button" class="maplink" id="eDeptMap" hidden>Visa på kartan</button></div>
     <select id="eDept"></select>
     <div class="fields">
       <div><label for="ePrice">Pris (kr)</label><input type="text" class="big" id="ePrice" inputmode="decimal" autocomplete="off"></div>
@@ -436,7 +438,7 @@
     <input type="text" id="wEditMax" inputmode="decimal" autocomplete="off">
     <label for="wEditImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="wEditImg" inputmode="url" autocomplete="off" style="font-size:16px">
-    <div class="labelrow" style="margin-top:10px"><label for="wEditDept">Avdelning</label></div>
+    <div class="labelrow" style="margin-top:10px"><label for="wEditDept">Avdelning</label><button type="button" class="maplink" id="wEditDeptMap" hidden>Visa på kartan</button></div>
     <select id="wEditDept"></select>
     <div class="row">
       <button type="button" class="btn" id="wEditCancel">Avbryt</button>
@@ -502,6 +504,16 @@
   <p class="small" id="deptDlgFor" style="margin:0"></p>
   <div class="picklist" id="deptPick"></div>
   <div class="row"><button type="button" class="btn" id="deptDlgCancel">Avbryt</button></div>
+</dialog>
+
+<dialog id="mapDlg" aria-labelledby="mapTitle">
+  <h2 id="mapTitle">Karta</h2>
+  <p class="mapwhere" id="mapWhere"></p>
+  <p class="small mapsecs" id="mapSecs"></p>
+  <div class="mapbox" id="mapBox"></div>
+  <p class="small" style="margin:6px 0 0">Tryck på en avdelning för att se vad den heter. Bokstav och siffra står på skyltarna i taket.
+    <a href="https://www.gekas.se/wp-content/uploads/2026/10/Varuhuskarta_261021.pdf" target="_blank" rel="noopener noreferrer">Gekås karta (PDF)</a></p>
+  <div class="row"><button type="button" class="btn primary" id="mapClose">Stäng</button></div>
 </dialog>
 
 <dialog id="deptSetDlg" aria-labelledby="deptSetTitle">
@@ -769,7 +781,7 @@
     if (state.view.items === 'dept') {
       groupByDept(shown).forEach(function (g) {
         var n = g.list.reduce(function (s, i) { return s + i.qty; }, 0), sum2 = g.list.reduce(function (s, i) { return s + i.price * i.qty; }, 0);
-        box.appendChild(groupHead(g.dept ? g.dept.name : 'Övrigt', n + ' st · ' + fmt(sum2), deptWhere(g.dept)));
+        box.appendChild(groupHead(g.dept ? g.dept.name : 'Övrigt', n + ' st · ' + fmt(sum2), g.dept));
         var ul2 = document.createElement('ul'); g.list.forEach(function (it) { ul2.appendChild(itemRow(it)); }); box.appendChild(ul2);
       });
     } else {
@@ -832,7 +844,7 @@
   function openEdit(id) {
     var it = find(id); if (!it) return; editId = id;
     $('eImg').value = it.img || ''; $('eName').value = it.name; $('ePrice').value = String(it.price).replace('.', ','); $('eQty').value = it.qty;
-    fillDeptSelect($('eDept'), it.dept);
+    fillDeptSelect($('eDept'), it.dept); syncMapLinks();
     $('editDlg').showModal();
   }
   $('eCancel').onclick = function () { $('editDlg').close(); };
@@ -1187,7 +1199,17 @@
   // Formulärens listor byggs om när avdelningarna ändras; valet behålls.
   function refreshDeptSelects() {
     ['dept', 'wDept', 'bDept'].forEach(function (id) { var s = $(id); fillDeptSelect(s, s.value); });
+    syncMapLinks();
   }
+  // "Visa på kartan" bredvid en avdelningslista syns när en avdelning med läge är vald.
+  var MAP_LINKS = { dept: 'deptMap', wDept: 'wDeptMap', eDept: 'eDeptMap', wEditDept: 'wEditDeptMap' };
+  function syncMapLinks() {
+    Object.keys(MAP_LINKS).forEach(function (sid) { var d = deptById($(sid).value); $(MAP_LINKS[sid]).hidden = !(d && d.level); });
+  }
+  Object.keys(MAP_LINKS).forEach(function (sid) {
+    $(sid).addEventListener('change', syncMapLinks);
+    $(MAP_LINKS[sid]).onclick = function () { openMap($(sid).value); };
+  });
   function deptChip(obj, text) {
     var d = deptById(obj.dept), b = document.createElement('button');
     b.type = 'button'; b.className = 'deptchip' + (d ? '' : ' none');
@@ -1239,11 +1261,19 @@
     if (groups['']) out.push({ dept: null, list: groups[''] });
     return out;
   }
-  function groupHead(title, right, where) {
+  function groupHead(title, right, dept) {
     var g = document.createElement('div'); g.className = 'grouphead';
-    var h = document.createElement('h3'); h.textContent = title;
-    var sm = document.createElement('small'); sm.textContent = right; h.appendChild(sm); g.appendChild(h);
-    if (where) { var w = document.createElement('div'); w.className = 'where'; w.textContent = where; g.appendChild(w); }
+    var hh = document.createElement('h3'); hh.textContent = title;
+    var sm = document.createElement('small'); sm.textContent = right; hh.appendChild(sm); g.appendChild(hh);
+    var where = deptWhere(dept);
+    if (where) {
+      var w = document.createElement('button'); w.type = 'button'; w.className = 'where';
+      w.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+      w.appendChild(document.createTextNode(where));
+      w.setAttribute('aria-label', where + '. Visa ' + dept.name + ' på kartan');
+      w.onclick = function () { openMap(dept.id); };
+      g.appendChild(w);
+    }
     return g;
   }
   function setupSeg(id, key) {
@@ -1258,6 +1288,90 @@
     });
   }
   setupSeg('itemView', 'items'); setupSeg('wishView', 'wishes');
+
+  /* ================= Karta =================
+     Egen förenklad ritning av Gekås varuhuskarta (oktober 2026). Plan 1 är rutnätet av takkuber:
+     rad A (vid kassorna) till K, kolumn 1 till 12. Övriga plan ritas som enkla block. */
+  var MAP_SVC = { I1: 'Macka & Jos', E6: 'Sportbaren', E7: 'Sportbaren', J2: 'Trappa till nedre och övre plan' };
+  var FLOORS = [
+    { level: 'Nedre plan', blocks: [
+      { dept: 'verktyg-bilvard', x: 0, y: 0, w: 1, h: 1, t: 'Verktyg & Bilvård' }, { dept: 'friluftsliv', x: 1, y: 0, w: 1, h: 1, t: 'Friluftsliv' },
+      { dept: 'hastsport', x: 0, y: 1, w: .5, h: 1, t: 'Hästsport' }, { dept: 'husdjur', x: .5, y: 1, w: .5, h: 1, t: 'Husdjur' },
+      { dept: 'friluftsliv', x: 1, y: 1, w: 1, h: 1, t: 'Jakt & Fiske' }] },
+    { level: 'Övre plan', blocks: [{ dept: 'barnklader', x: 0, y: 0, w: 2, h: 1, t: 'Barnkläder' }] },
+    { level: 'Plan 2', blocks: [
+      { dept: '', x: 0, y: 0, w: .8, h: 2, t: 'Kundvagnsparkering' }, { dept: 'jultorget', x: .8, y: 0, w: 1.2, h: 1, t: 'Jultorget & Säsong' },
+      { dept: 'skor', x: .8, y: 1, w: 1.2, h: 1, t: 'Skor' }] }
+  ];
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(name, attrs, parent) {
+    var e = document.createElementNS(SVGNS, name);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function svgText(parent, x, y, txt, cls) { var t = svgEl('text', { x: x, y: y, 'class': cls || '' }, parent); t.textContent = txt; return t; }
+  function deptAtCell(c) { return state.departments.find(function (d) { return d.cells && d.cells.indexOf(c) >= 0; }); }
+
+  var mapDept = '';
+  function openMap(id) { mapDept = deptById(id) ? id : ''; drawMap(); if (!$('mapDlg').open) $('mapDlg').showModal(); }
+  function drawMap() {
+    var d = deptById(mapDept), box = $('mapBox');
+    $('mapTitle').textContent = d ? d.name : 'Karta';
+    $('mapWhere').textContent = d ? (deptWhere(d) || 'Den här avdelningen har inget läge på kartan.') : 'Tryck på en avdelning.';
+    $('mapSecs').textContent = d && d.sections && d.sections.length ? d.sections.join(', ') : '';
+    box.innerHTML = '';
+    var W = 27, H = 22, L = 16, T = 14, rows = 'ABCDEFGHIJK';
+    var svg = svgEl('svg', { viewBox: '0 0 ' + (L + 12 * W + 2) + ' ' + (T + 11 * H + 34), 'class': 'map', role: 'img',
+      'aria-label': 'Karta över Plan 1' + (d ? ', ' + d.name + ' är markerad' : '') }, box);
+    for (var c = 1; c <= 12; c++) svgText(svg, L + (c - .5) * W, 10, String(c), 'axis');
+    for (var r = 0; r < 11; r++) {
+      var y = T + (10 - r) * H;
+      svgText(svg, 7, y + H / 2 + 3, rows[r], 'axis');
+      for (c = 1; c <= 12; c++) {
+        var id = rows[r] + c, cd = deptAtCell(id), svc = MAP_SVC[id];
+        if (!cd && !svc) continue;
+        var on = !!d && cd === d, via = !!d && d.via === id;
+        var g = svgEl('g', { 'class': 'cell' + (on ? ' on' : '') + (via ? ' via' : '') + (svc && !cd ? ' svc' : ''), 'data-dept': cd ? cd.id : '', 'data-name': cd ? cd.name : svc }, svg);
+        var rc = svgEl('rect', { x: L + (c - 1) * W + 1, y: y + 1, width: W - 2, height: H - 2, rx: 3 }, g);
+        if (cd && !on && !via) rc.style.fill = cd.color || '';
+        if (d && !on && !via) g.style.opacity = '.3';
+        if (on || via) svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, id, 'code');
+        else if (id === 'J2') svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, '⇅', 'code');
+      }
+    }
+    var by = T + 11 * H + 4;
+    svgEl('rect', { x: L + 1, y: by, width: 11 * W - 2, height: 11, rx: 3, 'class': 'kassor' }, svg);
+    svgText(svg, L + 5.5 * W, by + 8.5, 'Kassor', 'small');
+    svgText(svg, L + 2, by + 25, '← Ingång', 'small start');
+    svgText(svg, L + 10 * W, by + 25, 'Utgång →', 'small');
+    // Planen en trappa upp och ner: bara det som behövs, eller alla när ingen avdelning är vald.
+    FLOORS.forEach(function (fl) {
+      if (d && d.level !== fl.level) return;
+      var BW = 170, rowsN = fl.blocks.some(function (bl) { return bl.y >= 1; }) ? 2 : 1;
+      var s2 = svgEl('svg', { viewBox: '0 0 ' + (2 * BW + 2) + ' ' + (rowsN * 40 + 18), 'class': 'map floor', role: 'img',
+        'aria-label': fl.level + (d ? ', ' + d.name + ' är markerad' : '') }, box);
+      svgText(s2, 1, 11, fl.level + (fl.level === 'Plan 2' ? ' · rulltrappa vid F10' : ' · trappa vid J2'), 'floorname');
+      fl.blocks.forEach(function (bl) {
+        var bd = deptById(bl.dept), on = !!d && bd === d;
+        var g = svgEl('g', { 'class': 'cell' + (on ? ' on' : '') + (bd ? '' : ' svc'), 'data-dept': bd ? bd.id : '', 'data-name': bl.t }, s2);
+        var rc = svgEl('rect', { x: bl.x * BW + 1, y: 16 + bl.y * 40 + 1, width: bl.w * BW - 2, height: bl.h * 40 - 2, rx: 4 }, g);
+        if (bd && !on) rc.style.fill = bd.color || '';
+        if (d && !on) g.style.opacity = '.3';
+        svgText(g, (bl.x + bl.w / 2) * BW, 16 + (bl.y + bl.h / 2) * 40 + 4, bl.t, 'blk');
+      });
+    });
+  }
+  // Tryck på en ruta: visa den avdelningen (eller namnet på t.ex. Sportbaren).
+  $('mapBox').onclick = function (e) {
+    var g = e.target.closest && e.target.closest('.cell'); if (!g) return;
+    var id = g.getAttribute('data-dept');
+    mapDept = id || ''; drawMap();
+    if (!id) $('mapWhere').textContent = g.getAttribute('data-name');
+  };
+  $('mapClose').onclick = function () { $('mapDlg').close(); };
+  $('mapBtn').onclick = function () { openMap(''); };
+  $('mapBtn2').onclick = function () { openMap(''); };
 
   /* Inställning: ordning, namn, egna avdelningar, återställ */
   function renderDeptSettings() {
@@ -1346,7 +1460,7 @@
     var w = id && findWish(id);
     $('linkBanner').hidden = !w;
     if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '');
-    if (w && deptById(w.dept)) { $('dept').value = w.dept; syncPickBtn($('dept')); }
+    if (w && deptById(w.dept)) { $('dept').value = w.dept; syncPickBtn($('dept')); syncMapLinks(); }
   }
   $('linkCancel').onclick = function () { setLink(null); };
 
@@ -1378,12 +1492,12 @@
     var shown = ws.filter(function (w) { return !(hide && w.done) && !(wishFilter && w.person !== wishFilter); });
     var sections = [];
     if (byDept) {
-      groupByDept(shown).forEach(function (g) { sections.push({ title: g.dept ? g.dept.name : 'Övrigt', where: deptWhere(g.dept), list: g.list }); });
+      groupByDept(shown).forEach(function (g) { sections.push({ title: g.dept ? g.dept.name : 'Övrigt', dept: g.dept, list: g.list }); });
     } else {
       var groups = {}, order = ppl.slice();
       shown.forEach(function (w) { var key = w.person || 'Övrigt'; (groups[key] = groups[key] || []).push(w); });
       if (order.indexOf('Övrigt') < 0) order.push('Övrigt');
-      order.forEach(function (key) { if (groups[key]) sections.push({ title: key, where: '', list: groups[key] }); });
+      order.forEach(function (key) { if (groups[key]) sections.push({ title: key, dept: null, list: groups[key] }); });
     }
     var box = $('wishes'); box.innerHTML = '';
     sections.forEach(function (s) {
@@ -1391,7 +1505,7 @@
       arr.sort(function (a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); });
       var sec = document.createElement('div'); sec.className = 'wishgroup';
       var left2 = arr.filter(function (w) { return !w.done; }).length;
-      sec.appendChild(groupHead(s.title, left2 + ' kvar', s.where));
+      sec.appendChild(groupHead(s.title, left2 + ' kvar', s.dept));
       arr.forEach(function (w) {
         var row = document.createElement('div'); row.className = 'wish' + (w.done ? ' done' : '');
         var chk = document.createElement('button'); chk.className = 'check'; chk.setAttribute('role', 'checkbox');
@@ -1442,7 +1556,7 @@
     var dept = deptById($('wDept').value) ? $('wDept').value : '', dd = deptById(dept);
     state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg, dept: dept, max: max });
     save(); render(); toast('Tillagd: ' + t + ' · ' + (dd ? dd.name : 'Övrigt'), true);
-    $('wText').value = ''; $('wImg').value = ''; $('wMax').value = ''; $('wDept').value = ''; syncPickBtn($('wDept')); $('wText').focus();
+    $('wText').value = ''; $('wImg').value = ''; $('wMax').value = ''; $('wDept').value = ''; syncPickBtn($('wDept')); syncMapLinks(); $('wText').focus();
   }
   $('wAdd').onclick = addWish;
   $('wText').addEventListener('keydown', function (e) { if (e.key === 'Enter') addWish(); });
@@ -1453,7 +1567,7 @@
     var w = findWish(id); if (!w) return; editWish = id;
     $('wEditText').value = w.text; $('wEditPerson').value = w.person; $('wEditImg').value = w.img || '';
     $('wEditMax').value = w.max ? String(w.max).replace('.', ',') : '';
-    fillDeptSelect($('wEditDept'), w.dept); $('wishDlg').showModal();
+    fillDeptSelect($('wEditDept'), w.dept); syncMapLinks(); $('wishDlg').showModal();
   }
   $('wEditCancel').onclick = function () { $('wishDlg').close(); };
   $('wEditMax').addEventListener('input', function () { this.setCustomValidity(''); });
