@@ -97,9 +97,7 @@
   .item .name { position:relative; font-weight:600; font-size:15px; background:none; border:0; text-align:left; padding:0; min-height:24px; }
   .item .calc { color:var(--muted); font-size:13px; }
   .item .line { font-weight:700; font-size:16px; font-variant-numeric:tabular-nums; text-align:right; }
-  .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:14px; }
-  .item .acts button { min-width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2); font-weight:600; font-size:15px; line-height:1; padding:0; }
-  .item .acts .n { white-space:nowrap; min-width:28px; text-align:center; font-size:13px; margin:0 -6px; }
+  .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:10px; }
   .empty { color:var(--muted); padding:14px 0; }
   .tools { display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:12px; }
   .linkbtn { min-width:44px; background:none; border:0; color:var(--red); text-decoration:underline; text-underline-offset:3px; padding:10px 0; font-size:14px; min-height:44px; }
@@ -160,8 +158,8 @@
 
   /* Avdelningar */
   /* Små knappar med osynlig tryckyta på minst 44 x 44 px */
-  .wish .check, .wish .buy, .item .acts button, .seg button, .filters button, .deptchip { position:relative; }
-  .wish .check::before, .wish .buy::before, .item .acts button::before, .seg button::before, .filters button::before, .deptchip::before {
+  .wish .check, .wish .buy, .seg button, .filters button, .deptchip { position:relative; }
+  .wish .check::before, .wish .buy::before, .seg button::before, .filters button::before, .deptchip::before {
     content:""; position:absolute; left:50%; top:50%; width:max(100%, 44px); height:max(100%, 44px); transform:translate(-50%, -50%); }
   .filters { gap:12px 8px; }
   /* Avdelningsknapp: synlig pill inuti */
@@ -399,7 +397,13 @@
     <select id="eDept"></select>
     <div class="fields">
       <div><label for="ePrice">Pris (kr)</label><input type="text" class="big" id="ePrice" inputmode="decimal" autocomplete="off"></div>
-      <div><label for="eQty">Antal</label><input type="number" class="big" id="eQty" min="1" max="99" inputmode="numeric" style="width:90px"></div>
+      <div><label for="eQty">Antal</label>
+        <div class="stepper">
+          <button type="button" id="eQMinus" aria-label="Minska antal">−</button>
+          <input type="number" class="big" id="eQty" min="1" max="99" inputmode="numeric" style="width:56px;text-align:center;padding:9px 4px">
+          <button type="button" id="eQPlus" aria-label="Öka antal">+</button>
+        </div>
+      </div>
     </div>
     <div class="row">
       <button type="button" class="btn" id="eCancel">Avbryt</button>
@@ -591,7 +595,8 @@
     if (!s.deptLearn || typeof s.deptLearn !== 'object' || Array.isArray(s.deptLearn)) s.deptLearn = {};
     if (!s.view || typeof s.view !== 'object') s.view = {};
     if (s.view.wishes !== 'person' && s.view.wishes !== 'dept') s.view.wishes = 'dept';
-    if (s.view.items !== 'recent' && s.view.items !== 'dept') s.view.items = 'recent';
+    // Korgen visas per avdelning som standard. Har man själv valt "Senaste först" behålls det.
+    if ((s.view.items !== 'recent' && s.view.items !== 'dept') || s.view.itemsChosen !== true) s.view.items = 'dept';
     s.items.forEach(function (i) { if (typeof i.dept !== 'string') i.dept = ''; });
     s.wishes.forEach(function (w) {
       if (typeof w.dept !== 'string') w.dept = '';
@@ -753,25 +758,20 @@
   }
   function itemRow(it) {
       var li = document.createElement('li'); li.className = 'item';
-      li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>' +
-        '<div class="acts"><button aria-label="Minska antal">−</button><span class="n"></span>' +
-        '<button aria-label="Öka antal">+</button></div>';
+      // Antal och borttagning görs i ändra-rutan: tryck på namnet.
+      li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>';
       li.querySelector('.name').textContent = it.name || 'Namnlös vara';
-      li.querySelector('.name').setAttribute('aria-label', 'Ändra ' + (it.name || 'namnlös vara') + ', ' + fmt(it.price));
+      li.querySelector('.name').setAttribute('aria-label', 'Ändra ' + (it.name || 'namnlös vara') + ', ' + it.qty + ' st, ' + fmt(it.price * it.qty));
       li.querySelector('.calc').textContent = it.qty + ' × ' + fmt(it.price);
       li.querySelector('.line').textContent = fmt(it.price * it.qty);
-      li.querySelector('.n').textContent = it.qty + ' st';
       if (it.img) { var inf = li.querySelector('.info'); inf.insertBefore(makeThumb(it.img), inf.firstChild); }
       if (state.limit > 0 && it.price < state.limit) { var bd = li.querySelector('.badge'); bd.hidden = false; bd.textContent = 'Under ' + fmt(state.limit); }
-      var b = li.querySelectorAll('.acts button');   // − + (inte namnknappen; tryck på namnet för att ändra)
-      b[0].onclick = function () { // −
-        if (it.qty > 1) { snap('minskade ' + label(it)); it.qty--; toast(label(it) + ': ' + it.qty + ' st', true); }
-        else { snap('tog bort ' + label(it)); state.items = state.items.filter(function (x) { return x !== it; }); toast('Tog bort ' + label(it), true); }
-        save(); render();
-      };
-      b[1].onclick = function () { snap('ökade ' + label(it)); it.qty++; save(); render(); };
       li.querySelector('.name').onclick = function () { openEdit(it.id); };
-      li.querySelector('.acts').appendChild(deptChip(it, label(it)));
+      // Avdelningen syns i rubriken när korgen visas per avdelning; annars som en tagg på raden.
+      if (state.view.items !== 'dept') {
+        var acts = document.createElement('div'); acts.className = 'acts';
+        acts.appendChild(deptChip(it, label(it))); li.appendChild(acts);
+      }
       return li;
   }
   $('search').oninput = render;
@@ -814,6 +814,9 @@
     $('editDlg').showModal();
   }
   $('eCancel').onclick = function () { $('editDlg').close(); };
+  function eStep(d) { var n = parseInt($('eQty').value, 10) || 1; $('eQty').value = Math.max(1, Math.min(99, n + d)); }
+  $('eQMinus').onclick = function () { eStep(-1); };
+  $('eQPlus').onclick = function () { eStep(1); };
   $('editForm').onsubmit = function () {
     var it = find(editId); if (!it) return;
     var p = parsePrice($('ePrice').value), n = parseInt($('eQty').value, 10);
@@ -1268,7 +1271,7 @@
   function setupSeg(id, key) {
     var seg = $(id);
     Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
-      b.onclick = function () { state.view[key] = b.getAttribute('data-view'); save(); render(); };
+      b.onclick = function () { state.view[key] = b.getAttribute('data-view'); state.view[key + 'Chosen'] = true; save(); render(); };
     });
   }
   function syncSeg(id, value) {
@@ -1634,7 +1637,11 @@
       s.visit = { cartNo: str(o.visit.cartNo, 40), parking: str(o.visit.parking, 120),
         geo: g && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat: lat, lng: lng, ts: num(g.ts) || 0, acc: num(g.acc) || 0 } : null };
     }
-    if (o.view && typeof o.view === 'object') s.view = { items: o.view.items, wishes: o.view.wishes };
+    if (o.view && typeof o.view === 'object') {
+      s.view = { items: o.view.items, wishes: o.view.wishes };
+      if (o.view.itemsChosen === true) s.view.itemsChosen = true;
+      if (o.view.wishesChosen === true) s.view.wishesChosen = true;
+    }
     if (num(o.lastExport) > 0) s.lastExport = o.lastExport;
     return { state: upgrade(s), exportedAt: str(o.exportedAt, 40), version: num(o.version) || (o.departments ? 3 : 2) };
   }
