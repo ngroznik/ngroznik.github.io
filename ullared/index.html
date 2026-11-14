@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffd60a">
+<title>Ullared-kassen</title>
+<style>
+  :root {
+    --bg:#fffbea; --surface:#fff; --ink:#1a1a1a; --muted:#5c5c5c;
+    --tag:#ffd60a; --red:#c8102e; --green:#1b7a3a; --line:#e3dcb8; --radius:14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17160f; --surface:#24231a; --ink:#f5f1d8; --muted:#b7b296; --line:#3b3926; --green:#5fd081; }
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink);
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 90px); -webkit-tap-highlight-color:transparent; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  :focus-visible { outline:3px solid var(--red); outline-offset:2px; }
+
+  .total { position:sticky; top:0; z-index:10; background:var(--tag); color:#1a1a1a;
+    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 8px; border-bottom:3px solid #1a1a1a; }
+  .total .top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .total .label { font-size:14px; font-weight:600; }
+  .total .sum { font-size:38px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:-.5px; line-height:1.1; }
+  .undo { min-height:44px; padding:0 14px; border-radius:999px; border:2px solid #1a1a1a; background:#fff; color:#1a1a1a; font-weight:800; }
+  .undo:disabled { opacity:.35; }
+  .budgetline { font-size:14px; font-weight:700; margin-top:4px; display:none; }
+  .bar { height:8px; border-radius:4px; background:rgba(0,0,0,.2); margin-top:4px; overflow:hidden; display:none; }
+  .bar > i { display:block; height:100%; background:#1a1a1a; width:0; transition:width .2s; }
+  .bar.over > i { background:var(--red); }
+
+  main { max-width:560px; margin:0 auto; padding:14px; }
+  .camera { position:relative; border-radius:var(--radius); overflow:hidden; background:#000; aspect-ratio:4/3; }
+  .camera video { width:100%; height:100%; object-fit:cover; display:block; }
+  .frame { position:absolute; left:15%; right:15%; top:32%; bottom:32%; border:3px solid var(--tag); border-radius:10px;
+    box-shadow:0 0 0 999px rgba(0,0,0,.45); pointer-events:none; }
+  .cam-msg { position:absolute; inset:0; display:none; place-items:center; text-align:center; color:#fff; padding:20px; font-size:15px; }
+  .cam-msg.show { display:grid; }
+  .torch { position:absolute; right:10px; top:10px; display:none; min-height:44px; padding:0 14px; border-radius:999px;
+    border:0; background:rgba(255,255,255,.9); color:#1a1a1a; font-weight:700; }
+  .torch.show { display:block; }
+  .torch[aria-pressed=true] { background:var(--tag); }
+
+  .row { display:flex; gap:10px; margin-top:10px; }
+  .btn { flex:1; min-height:52px; border-radius:var(--radius); border:2px solid var(--ink); background:var(--surface); font-weight:700; }
+  .btn.primary { background:var(--ink); color:var(--bg); }
+  .btn.red { background:var(--red); border-color:var(--red); color:#fff; }
+  .btn:disabled { opacity:.5; }
+
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-top:14px; }
+  label { display:block; font-size:14px; color:var(--muted); margin-bottom:4px; }
+  input[type=text], input[type=number], input[type=search] { width:100%; font:inherit; font-size:22px; font-weight:700;
+    padding:8px 12px; border:2px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); }
+  input.big { font-size:28px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .fields { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end; margin-top:10px; }
+  .stepper { display:flex; align-items:center; gap:6px; }
+  .stepper button { width:48px; height:48px; border-radius:50%; border:2px solid var(--ink); background:var(--surface); font-size:26px; font-weight:700; line-height:1; }
+  .stepper output { min-width:36px; text-align:center; font-size:28px; font-weight:800; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .chip { border:2px solid var(--ink); background:var(--tag); color:#1a1a1a; border-radius:999px; padding:6px 14px; font-weight:800; font-size:18px; }
+  .status { font-size:14px; color:var(--muted); min-height:20px; margin-top:8px; }
+
+  .listhead { display:flex; justify-content:space-between; align-items:center; margin:22px 0 6px; }
+  h2 { font-size:18px; margin:0; }
+  ul { list-style:none; margin:0; padding:0; }
+  li.item { display:grid; grid-template-columns:1fr auto; gap:4px 10px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
+  .item .name { font-weight:700; font-size:17px; background:none; border:0; text-align:left; padding:0; }
+  .item .calc { color:var(--muted); font-size:14px; }
+  .item .line { font-weight:800; font-size:20px; font-variant-numeric:tabular-nums; text-align:right; }
+  .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:8px; }
+  .item .acts button { min-width:44px; height:44px; border-radius:10px; border:2px solid var(--line); background:var(--surface); font-weight:700; font-size:18px; }
+  .item .acts .edit { margin-left:auto; font-size:15px; padding:0 12px; }
+  .empty { color:var(--muted); padding:14px 0; }
+  .tools { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:10px; }
+  .linkbtn { background:none; border:0; color:var(--red); text-decoration:underline; padding:10px 0; font-size:15px; min-height:44px; }
+  .linkbtn.neutral { color:var(--ink); }
+  .small { font-size:13px; color:var(--muted); margin-top:14px; }
+
+  .toast { position:fixed; left:12px; right:12px; bottom:calc(env(safe-area-inset-bottom,0px) + 12px); max-width:536px; margin:0 auto;
+    background:#1a1a1a; color:#fff; border-radius:var(--radius); padding:8px 8px 8px 16px; display:none; align-items:center; gap:10px; z-index:30; }
+  .toast.show { display:flex; }
+  .toast span { flex:1; font-size:15px; }
+  .toast button { min-height:44px; padding:0 16px; border-radius:10px; border:0; background:var(--tag); color:#1a1a1a; font-weight:800; }
+
+  dialog { border:0; border-radius:var(--radius); padding:18px; width:min(92vw,420px); background:var(--surface); color:var(--ink); }
+  dialog::backdrop { background:rgba(0,0,0,.55); }
+  dialog .row .btn { min-height:48px; }
+  [hidden] { display:none !important; }
+  .info { display:flex; gap:10px; align-items:center; min-width:0; }
+  .meta { min-width:0; }
+  .thumb { width:56px; height:56px; border-radius:10px; object-fit:cover; background:var(--line); flex:none; display:block; }
+  .thumblink { font-size:13px; color:var(--red); text-decoration:underline; display:flex; align-items:center; min-height:44px; flex:none; }
+  .badge { display:inline-block; background:#1b7a3a; color:#fff; border-radius:999px; font-size:12px; font-weight:800; padding:2px 9px; margin-top:3px; }
+  .pricehint { margin-top:8px; font-weight:700; font-size:15px; min-height:20px; color:var(--muted); }
+  .pricehint.low { color:var(--green); }
+  .wtxt { display:flex; align-items:center; gap:10px; min-width:0; }
+  .tabs { display:grid; grid-template-columns:1fr 1fr; max-width:560px; margin:12px auto 0; padding:0 14px; }
+  .tabs button { min-height:50px; border:2px solid var(--ink); background:var(--surface); font-weight:800; font-size:16px; }
+  .tabs button:first-child { border-radius:var(--radius) 0 0 var(--radius); border-right-width:1px; }
+  .tabs button:last-child { border-radius:0 var(--radius) var(--radius) 0; border-left-width:1px; }
+  .tabs button[aria-selected=true] { background:var(--ink); color:var(--bg); }
+  .linkbanner { display:flex; align-items:center; gap:8px; background:var(--tag); color:#1a1a1a; border-radius:10px; padding:8px 8px 8px 12px; margin-bottom:10px; font-weight:700; }
+  .linkbanner span { flex:1; }
+  .linkbanner button { min-height:40px; padding:0 12px; border-radius:8px; border:2px solid #1a1a1a; background:#fff; color:#1a1a1a; font-weight:700; }
+  .wishadd { display:grid; gap:10px; }
+  .wishgroup { margin-top:18px; }
+  .wishgroup h3 { font-size:16px; margin:0 0 2px; display:flex; justify-content:space-between; }
+  .wishgroup h3 small { color:var(--muted); font-weight:600; font-size:14px; }
+  .wish { display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); }
+  .wish .check { width:44px; height:44px; border-radius:10px; border:2px solid var(--ink); background:var(--surface); font-size:22px; font-weight:900; line-height:1; }
+  .wish .check[aria-checked=true] { background:var(--green); border-color:var(--green); color:#fff; }
+  .wish .txt { font-size:17px; font-weight:600; background:none; border:0; text-align:left; padding:4px 0; min-height:44px; }
+  .wish.done .txt { text-decoration:line-through; color:var(--muted); font-weight:500; }
+  .wish .buy { min-height:44px; padding:0 12px; border-radius:10px; border:2px solid var(--red); background:var(--surface); color:var(--red); font-weight:800; }
+  .wish .more { width:44px; height:44px; border-radius:10px; border:2px solid var(--line); background:var(--surface); font-size:20px; font-weight:800; }
+  .filters { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .filters button { min-height:40px; padding:0 14px; border-radius:999px; border:2px solid var(--ink); background:var(--surface); font-weight:700; }
+  .filters button[aria-pressed=true] { background:var(--ink); color:var(--bg); }
+  textarea { width:100%; font:inherit; font-size:17px; padding:10px 12px; border:2px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); min-height:150px; }
+  .check-row { display:flex; align-items:center; gap:10px; min-height:44px; margin-top:8px; font-size:15px; color:var(--ink); }
+  .check-row input { width:22px; height:22px; }
+  .sr { position:absolute; left:-9999px; }
+</style>
+</head>
+<body>
+
+<div class="total">
+  <div class="top">
+    <div>
+      <div class="label"><span id="countTxt">0 varor</span></div>
+      <div class="sum" id="sum" aria-live="polite">0 kr</div>
+    </div>
+    <button class="undo" id="undoBtn" disabled>Ångra</button>
+  </div>
+  <div class="budgetline" id="budgetLine" aria-live="polite"></div>
+  <div class="bar" id="bar"><i></i></div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button role="tab" id="tabScanBtn" aria-selected="true">Skanna</button>
+  <button role="tab" id="tabListBtn" aria-selected="false">Att köpa</button>
+</div>
+
+<main>
+<section id="paneScan">
+  <div class="camera">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="frame" aria-hidden="true"></div>
+    <div class="cam-msg" id="camMsg">Kameran är inte på.<br>Tryck "Starta kamera".</div>
+    <button class="torch" id="torchBtn" aria-pressed="false">Ficklampa</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="camBtn">Starta kamera</button>
+    <button class="btn primary" id="scanBtn" disabled>Läs pris</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="photoBtn">Ta bild istället</button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">
+  </div>
+  <div class="status" id="status" role="status"></div>
+
+  <div class="card">
+    <div class="linkbanner" id="linkBanner" hidden><span id="linkTxt"></span><button type="button" id="linkCancel">Avbryt</button></div>
+    <div class="chips" id="chips" aria-label="Förslag på pris"></div>
+    <label for="name">Vad är det? (valfritt)</label>
+    <input type="text" id="name" placeholder="t.ex. Barnjeans, röd" autocomplete="off" enterkeyhint="next">
+    <label for="img" style="margin-top:10px">Bild- eller produktlänk (valfritt)</label>
+    <input type="text" id="img" inputmode="url" placeholder="https://…" autocomplete="off" style="font-size:16px">
+    <div class="fields">
+      <div>
+        <label for="price">Pris (kr)</label>
+        <input type="text" class="big" id="price" inputmode="decimal" placeholder="0" autocomplete="off">
+      </div>
+      <div>
+        <label for="qty">Antal</label>
+        <div class="stepper">
+          <button type="button" id="qMinus" aria-label="Minska antal">−</button>
+          <output id="qty">1</output>
+          <button type="button" id="qPlus" aria-label="Öka antal">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="pricehint" id="priceHint" aria-live="polite"></div>
+    <div class="row"><button class="btn red" id="addBtn">Lägg i korgen</button></div>
+  </div>
+
+  <div class="listhead"><h2>Korgen</h2></div>
+  <input type="search" id="search" placeholder="Sök i korgen" aria-label="Sök i korgen" style="font-size:16px;display:none">
+  <ul id="list"></ul>
+  <div class="empty" id="empty">Inget i korgen än.</div>
+
+  <div class="tools">
+    <button class="linkbtn neutral" id="budgetBtn">Budget &amp; prisgräns</button>
+    <button class="linkbtn neutral" id="shareBtn">Dela / kopiera lista</button>
+    <button class="linkbtn" id="clearBtn">Töm korgen</button>
+  </div>
+
+  <p class="small">Allt sparas bara i den här webbläsaren på din telefon. Töm du webbläsarens webbplatsdata försvinner korgen. Kontrollera alltid att inläst pris stämmer.</p>
+</section>
+
+<section id="paneList" hidden>
+  <div class="card wishadd">
+    <div>
+      <label for="wText">Något som ska köpas</label>
+      <input type="text" id="wText" placeholder="t.ex. Vinterskor stl 34" autocomplete="off" enterkeyhint="done">
+    </div>
+    <div>
+      <label for="wPerson">Till vem? (valfritt)</label>
+      <input type="text" id="wPerson" list="peopleList" placeholder="t.ex. Emma" autocomplete="off">
+      <datalist id="peopleList"></datalist>
+    </div>
+    <div>
+      <label for="wImg">Bild- eller produktlänk (valfritt)</label>
+      <input type="text" id="wImg" inputmode="url" placeholder="https://…" autocomplete="off" style="font-size:16px">
+    </div>
+    <div class="row" style="margin-top:0">
+      <button class="btn red" id="wAdd">Lägg till i listan</button>
+      <button class="btn" id="wBulk">Klistra in flera</button>
+    </div>
+  </div>
+
+  <div class="listhead"><h2>Att köpa</h2><span id="wishCount" style="color:var(--muted);font-size:14px"></span></div>
+  <div class="filters" id="wishFilter"></div>
+  <label class="check-row"><input type="checkbox" id="hideDone"> Dölj de som är klara</label>
+  <div id="wishes"></div>
+  <div class="empty" id="wishEmpty">Listan är tom. Lägg till önskningar ovan.</div>
+  <div class="tools">
+    <button class="linkbtn neutral" id="wShare">Dela listan</button>
+    <button class="linkbtn" id="wClearDone">Ta bort klara</button>
+  </div>
+</section>
+</main>
+
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button id="toastUndo">Ångra</button></div>
+
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <label for="eName">Namn</label>
+    <input type="text" id="eName" autocomplete="off">
+    <label for="eImg" style="margin-top:10px">Bild- eller produktlänk</label>
+    <input type="text" id="eImg" inputmode="url" autocomplete="off" style="font-size:16px">
+    <div class="fields">
+      <div><label for="ePrice">Pris (kr)</label><input type="text" class="big" id="ePrice" inputmode="decimal" autocomplete="off"></div>
+      <div><label for="eQty">Antal</label><input type="number" class="big" id="eQty" min="1" max="99" inputmode="numeric" style="width:90px"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="eCancel">Avbryt</button>
+      <button type="submit" class="btn primary" id="eSave">Spara</button>
+    </div>
+    <div class="row"><button type="button" class="btn" id="eDelete" style="color:var(--red);border-color:var(--red)">Ta bort varan</button></div>
+  </form>
+</dialog>
+
+<dialog id="budgetDlg">
+  <form method="dialog" id="budgetForm">
+    <label for="bInput">Din budget (kr). Lämna tomt för ingen budget.</label>
+    <input type="text" class="big" id="bInput" inputmode="decimal" autocomplete="off">
+    <label for="bLimit" style="margin-top:12px">Märk varor som kostar under (kr). Lämna tomt för ingen märkning.</label>
+    <input type="text" class="big" id="bLimit" inputmode="decimal" autocomplete="off">
+    <div class="row">
+      <button type="button" class="btn" id="bCancel">Avbryt</button>
+      <button type="submit" class="btn primary">Spara</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="wishDlg">
+  <form method="dialog" id="wishForm">
+    <label for="wEditText">Vad</label>
+    <input type="text" id="wEditText" autocomplete="off">
+    <label for="wEditPerson" style="margin-top:10px">Till vem</label>
+    <input type="text" id="wEditPerson" list="peopleList" autocomplete="off">
+    <label for="wEditImg" style="margin-top:10px">Bild- eller produktlänk</label>
+    <input type="text" id="wEditImg" inputmode="url" autocomplete="off" style="font-size:16px">
+    <div class="row">
+      <button type="button" class="btn" id="wEditCancel">Avbryt</button>
+      <button type="submit" class="btn primary">Spara</button>
+    </div>
+    <div class="row"><button type="button" class="btn" id="wEditDelete" style="color:var(--red);border-color:var(--red)">Ta bort</button></div>
+  </form>
+</dialog>
+
+<dialog id="bulkDlg">
+  <form method="dialog" id="bulkForm">
+    <label for="bText">Klistra in en sak per rad. Skriv en rad som "Emma:" för att byta person.</label>
+    <textarea id="bText" placeholder="Emma:&#10;Vinterskor&#10;Mössa&#10;Liam:&#10;Fotbollsstrumpor"></textarea>
+    <label for="bPerson" style="margin-top:10px">Person för rader utan rubrik (valfritt)</label>
+    <input type="text" id="bPerson" list="peopleList" autocomplete="off">
+    <div class="row">
+      <button type="button" class="btn" id="bulkCancel">Avbryt</button>
+      <button type="submit" class="btn primary">Lägg till</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = 'ullared-kassa-v2';
+  var state = { items: [], budget: 0 };
+  var history = [];            // ögonblicksbilder för Ångra
+  var qty = 1, editId = null;
+  var video = $('video'), stream = null, worker = null, workerLoading = null, wakeLock = null, toastTimer = null;
+
+  /* ---------- Lagring (med flytt från v1) ---------- */
+  try {
+    var raw = localStorage.getItem(STORE);
+    if (raw) state = JSON.parse(raw);
+    else {
+      var old = JSON.parse(localStorage.getItem('ullared-kassa-v1') || '[]');
+      state.items = old.map(function (o) { return { id: uid(), name: '', price: o.price, qty: o.qty }; });
+    }
+  } catch (e) {}
+  if (!Array.isArray(state.wishes)) state.wishes = [];
+  if (typeof state.limit !== 'number') state.limit = 200;
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  /* ---------- Hjälp ---------- */
+  function fmt(n) {
+    var r = Math.round(n * 100) / 100;
+    return r.toLocaleString('sv-SE', { minimumFractionDigits: r % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' kr';
+  }
+  function parsePrice(s) { var n = parseFloat(String(s).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : NaN; }
+  function setStatus(t) { $('status').textContent = t || ''; }
+  function find(id) { return state.items.find(function (i) { return i.id === id; }); }
+  function label(it) { return it.name || fmt(it.price); }
+
+  /* ---------- Ångra ---------- */
+  function snap(msg) {
+    history.push({ data: JSON.stringify(state), msg: msg });
+    if (history.length > 40) history.shift();
+  }
+  function undo() {
+    var h = history.pop(); if (!h) return;
+    state = JSON.parse(h.data); save(); render();
+    toast('Ångrade: ' + h.msg, false);
+  }
+  function toast(msg, withUndo) {
+    $('toastMsg').textContent = msg;
+    $('toastUndo').style.display = withUndo ? 'block' : 'none';
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { $('toast').classList.remove('show'); }, 6000);
+  }
+  $('undoBtn').onclick = undo;
+  $('toastUndo').onclick = function () { $('toast').classList.remove('show'); undo(); };
+
+  /* ---------- Render ---------- */
+  function total() { return state.items.reduce(function (s, i) { return s + i.price * i.qty; }, 0); }
+  function render() {
+    var sum = total(), count = state.items.reduce(function (s, i) { return s + i.qty; }, 0);
+    $('sum').textContent = fmt(sum);
+    $('countTxt').textContent = count + (count === 1 ? ' vara' : ' varor') + ' i korgen';
+    $('undoBtn').disabled = !history.length;
+    renderWishes();
+    updateHint();
+
+    var bl = $('budgetLine'), bar = $('bar');
+    if (state.budget > 0) {
+      var left = state.budget - sum;
+      bl.style.display = 'block'; bar.style.display = 'block';
+      bl.textContent = left >= 0 ? 'Kvar av budget: ' + fmt(left) : 'Över budget med ' + fmt(-left);
+      bar.classList.toggle('over', left < 0);
+      bar.firstChild.style.width = Math.min(100, sum / state.budget * 100) + '%';
+    } else {
+      bl.style.display = 'none'; bar.style.display = 'none';
+    }
+
+    var q = $('search').value.trim().toLowerCase();
+    $('search').style.display = state.items.length > 6 ? 'block' : 'none';
+    var ul = $('list'); ul.innerHTML = '';
+    state.items.slice().reverse().forEach(function (it) {
+      if (q && (it.name || '').toLowerCase().indexOf(q) < 0 && String(it.price).indexOf(q) < 0) return;
+      var li = document.createElement('li'); li.className = 'item';
+      li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>' +
+        '<div class="acts"><button aria-label="Minska antal">−</button><span class="n"></span>' +
+        '<button aria-label="Öka antal">+</button><button class="edit">Ändra</button></div>';
+      li.querySelector('.name').textContent = it.name || 'Namnlös vara';
+      li.querySelector('.calc').textContent = it.qty + ' × ' + fmt(it.price);
+      li.querySelector('.line').textContent = fmt(it.price * it.qty);
+      li.querySelector('.n').textContent = it.qty + ' st';
+      if (it.img) { var inf = li.querySelector('.info'); inf.insertBefore(makeThumb(it.img), inf.firstChild); }
+      if (state.limit > 0 && it.price < state.limit) { var bd = li.querySelector('.badge'); bd.hidden = false; bd.textContent = 'Under ' + fmt(state.limit); }
+      var b = li.querySelectorAll('button');
+      b[0].onclick = function () { // −
+        if (it.qty > 1) { snap('minskade ' + label(it)); it.qty--; toast(label(it) + ': ' + it.qty + ' st', true); }
+        else { snap('tog bort ' + label(it)); state.items = state.items.filter(function (x) { return x !== it; }); toast('Tog bort ' + label(it), true); }
+        save(); render();
+      };
+      b[1].onclick = function () { snap('ökade ' + label(it)); it.qty++; save(); render(); };
+      b[2].onclick = function () { openEdit(it.id); };
+      li.querySelector('.name').onclick = function () { openEdit(it.id); };
+      ul.appendChild(li);
+    });
+    $('empty').style.display = state.items.length ? 'none' : 'block';
+    $('clearBtn').style.display = state.items.length ? 'inline-block' : 'none';
+    $('shareBtn').style.display = state.items.length ? 'inline-block' : 'none';
+  }
+  $('search').oninput = render;
+
+  /* ---------- Antal ---------- */
+  function setQty(n) { qty = Math.max(1, Math.min(99, n)); $('qty').textContent = qty; }
+  $('qMinus').onclick = function () { setQty(qty - 1); };
+  $('qPlus').onclick = function () { setQty(qty + 1); };
+
+  /* ---------- Lägg till ---------- */
+  function add() {
+    var p = parsePrice($('price').value);
+    if (!(p > 0)) { setStatus('Skriv in ett pris först.'); $('price').focus(); return; }
+    var name = $('name').value.trim();
+    snap('la till ' + (name || fmt(p)));
+    var ex = state.items.find(function (i) { return i.price === p && (i.name || '').toLowerCase() === name.toLowerCase(); });
+    var img = safeUrl($('img').value);
+    if (ex) { ex.qty = Math.min(99, ex.qty + qty); if (img && !ex.img) ex.img = img; }
+    else state.items.push({ id: uid(), name: name, price: p, qty: qty, img: img });
+    if (linked) { var lw = findWish(linked); if (lw) lw.done = true; setLink(null); }
+    save(); render();
+    toast('Tillagd: ' + (name ? name + ', ' : '') + qty + ' × ' + fmt(p), true);
+    $('price').value = ''; $('img').value = ''; updateHint(); $('name').value = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+  $('addBtn').onclick = add;
+  $('price').addEventListener('keydown', function (e) { if (e.key === 'Enter') add(); });
+  $('name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('price').focus(); } });
+
+  /* ---------- Ändra vara ---------- */
+  function openEdit(id) {
+    var it = find(id); if (!it) return; editId = id;
+    $('eImg').value = it.img || ''; $('eName').value = it.name; $('ePrice').value = String(it.price).replace('.', ','); $('eQty').value = it.qty;
+    $('editDlg').showModal();
+  }
+  $('eCancel').onclick = function () { $('editDlg').close(); };
+  $('editForm').onsubmit = function () {
+    var it = find(editId); if (!it) return;
+    var p = parsePrice($('ePrice').value), n = parseInt($('eQty').value, 10);
+    if (!(p > 0) || !(n > 0)) return;
+    snap('ändrade ' + label(it));
+    it.name = $('eName').value.trim(); it.img = safeUrl($('eImg').value); it.price = p; it.qty = Math.min(99, n);
+    save(); render(); toast('Sparade ändringen', true);
+  };
+  $('eDelete').onclick = function () {
+    var it = find(editId); if (!it) return;
+    snap('tog bort ' + label(it));
+    state.items = state.items.filter(function (x) { return x.id !== editId; });
+    $('editDlg').close(); save(); render(); toast('Tog bort ' + label(it), true);
+  };
+
+  /* ---------- Budget ---------- */
+  $('budgetBtn').onclick = function () { $('bInput').value = state.budget ? String(state.budget).replace('.', ',') : ''; $('bLimit').value = state.limit ? String(state.limit).replace('.', ',') : ''; $('budgetDlg').showModal(); };
+  $('bCancel').onclick = function () { $('budgetDlg').close(); };
+  $('budgetForm').onsubmit = function () {
+    var v = $('bInput').value.trim(); var p = v ? parsePrice(v) : 0;
+    state.budget = p > 0 ? p : 0;
+    var lv = $('bLimit').value.trim(), lp = lv ? parsePrice(lv) : 0; state.limit = lp > 0 ? lp : 0;
+    save(); render();
+  };
+
+  /* ---------- Töm / dela ---------- */
+  $('clearBtn').onclick = function () {
+    if (!confirm('Tömma hela korgen? Du kan ångra direkt efteråt.')) return;
+    snap('tömde korgen'); state.items = []; save(); render(); toast('Korgen är tom', true);
+  };
+  $('shareBtn').onclick = function () {
+    var lines = state.items.map(function (i) { return (i.name || 'Vara') + ': ' + i.qty + ' × ' + fmt(i.price) + ' = ' + fmt(i.price * i.qty); });
+    lines.push('', 'Totalt: ' + fmt(total()));
+    var text = lines.join('\n');
+    if (navigator.share) { navigator.share({ title: 'Ullared-korgen', text: text }).catch(function () {}); }
+    else if (navigator.clipboard) { navigator.clipboard.writeText(text).then(function () { toast('Listan är kopierad', false); }); }
+    else { prompt('Kopiera listan:', text); }
+  };
+
+  /* ---------- Kamera ---------- */
+  function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus('Kameran stöds inte här. Använd "Ta bild istället".'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+      .then(function (s) {
+        stream = s; video.srcObject = s;
+        $('camMsg').classList.remove('show'); $('scanBtn').disabled = false; $('camBtn').textContent = 'Stoppa kamera'; setStatus('');
+        var t = s.getVideoTracks()[0], caps = t.getCapabilities ? t.getCapabilities() : {};
+        $('torchBtn').classList.toggle('show', !!caps.torch);
+        if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
+        loadWorker();
+      })
+      .catch(function () { $('camMsg').classList.add('show'); setStatus('Ingen kameraåtkomst. Tillåt kameran i webbläsaren, eller använd "Ta bild istället".'); });
+  }
+  function stopCamera() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; video.srcObject = null;
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    $('camMsg').classList.add('show'); $('scanBtn').disabled = true; $('camBtn').textContent = 'Starta kamera';
+    $('torchBtn').classList.remove('show'); $('torchBtn').setAttribute('aria-pressed', 'false');
+  }
+  $('camBtn').onclick = function () { stream ? stopCamera() : startCamera(); };
+  $('torchBtn').onclick = function () {
+    if (!stream) return;
+    var on = $('torchBtn').getAttribute('aria-pressed') !== 'true';
+    stream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: on }] })
+      .then(function () { $('torchBtn').setAttribute('aria-pressed', String(on)); }).catch(function () {});
+  };
+
+  /* ---------- OCR ---------- */
+  function loadWorker() {
+    if (worker) return Promise.resolve(worker);
+    if (workerLoading) return workerLoading;
+    if (!window.Tesseract) { setStatus('Kunde inte ladda läsaren. Kolla nätet och ladda om.'); return Promise.reject(); }
+    setStatus('Laddar läsaren (första gången tar det en stund)…');
+    workerLoading = Tesseract.createWorker('eng').then(function (w) {
+      return w.setParameters({ tessedit_char_whitelist: '0123456789.,:-', tessedit_pageseg_mode: '7' })
+        .then(function () { worker = w; setStatus(''); return w; });
+    });
+    return workerLoading;
+  }
+  function prepare(source, sw, sh, c0) {
+    var sx = sw * c0.x, sy = sh * c0.y, cw = sw * c0.w, ch = sh * c0.h, scale = Math.min(2, 1200 / cw);
+    var c = document.createElement('canvas'); c.width = Math.round(cw * scale); c.height = Math.round(ch * scale);
+    var g = c.getContext('2d'); g.drawImage(source, sx, sy, cw, ch, 0, 0, c.width, c.height);
+    var d = g.getImageData(0, 0, c.width, c.height), px = d.data, min = 255, max = 0, i, v;
+    for (i = 0; i < px.length; i += 4) { v = .299 * px[i] + .587 * px[i + 1] + .114 * px[i + 2]; px[i] = v; if (v < min) min = v; if (v > max) max = v; }
+    var range = Math.max(1, max - min);
+    for (i = 0; i < px.length; i += 4) { v = (px[i] - min) / range * 255; px[i] = px[i + 1] = px[i + 2] = v; }
+    g.putImageData(d, 0, 0); return c;
+  }
+  function extractPrices(text) {
+    var out = [], seen = {}, m = String(text).replace(/[\n\r]+/g, ' ').match(/\d{1,5}(?:[.,]\d{1,2})?/g) || [];
+    m.forEach(function (s) { var n = parsePrice(s); if (n > 0 && n < 100000 && !seen[n]) { seen[n] = 1; out.push(n); } });
+    return out;
+  }
+  function showResult(prices) {
+    var chips = $('chips'); chips.innerHTML = '';
+    if (!prices.length) { setStatus('Hittade inget pris. Försök igen närmare, eller skriv in det själv.'); return; }
+    prices.slice(0, 4).forEach(function (p) {
+      var b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.textContent = String(p).replace('.', ',');
+      b.onclick = function () { $('price').value = String(p).replace('.', ','); updateHint(); };
+      chips.appendChild(b);
+    });
+    $('price').value = String(prices[0]).replace('.', ',');
+    updateHint();
+    setStatus(prices.length > 1 ? 'Flera siffror hittades – välj rätt pris ovan.' : 'Kontrollera att priset stämmer.');
+    $('name').focus({ preventScroll: true });
+  }
+  function recognize(canvas) {
+    setStatus('Läser…'); $('scanBtn').disabled = true;
+    return loadWorker().then(function (w) { return w.recognize(canvas); })
+      .then(function (r) { showResult(extractPrices(r.data.text)); })
+      .catch(function () { setStatus('Något gick fel vid läsningen. Skriv in priset själv.'); })
+      .then(function () { $('scanBtn').disabled = !stream; });
+  }
+  $('scanBtn').onclick = function () {
+    if (!video.videoWidth) return;
+    recognize(prepare(video, video.videoWidth, video.videoHeight, { x: .15, y: .32, w: .70, h: .36 }));
+  };
+  $('photoBtn').onclick = function () { $('photoInput').click(); };
+  $('photoInput').onchange = function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    var img = new Image();
+    img.onload = function () { URL.revokeObjectURL(img.src); recognize(prepare(img, img.naturalWidth, img.naturalHeight, { x: .1, y: .25, w: .8, h: .5 })); };
+    img.src = URL.createObjectURL(f); e.target.value = '';
+  };
+
+  /* ---------- Länkar, bilder, prismärkning ---------- */
+  function safeUrl(u) {
+    u = String(u || '').trim(); if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    try { var x = new URL(u); return ((x.protocol === 'http:' || x.protocol === 'https:') && x.hostname.indexOf('.') > 0) ? x.href : ''; }
+    catch (e) { return ''; }
+  }
+  function makeThumb(url) {
+    var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label', 'Öppna bild eller länk');
+    var im = document.createElement('img'); im.className = 'thumb'; im.alt = ''; im.loading = 'lazy'; im.referrerPolicy = 'no-referrer'; im.src = url;
+    im.onerror = function () { a.textContent = 'Öppna länk'; a.className = 'thumblink'; };
+    a.appendChild(im); return a;
+  }
+  function updateHint() {
+    var h = $('priceHint'), p = parsePrice($('price').value);
+    if (!(p > 0) || !(state.limit > 0)) { h.textContent = ''; h.className = 'pricehint'; return; }
+    if (p < state.limit) { h.textContent = '✓ Under ' + fmt(state.limit); h.className = 'pricehint low'; }
+    else { h.textContent = fmt(state.limit) + ' eller mer'; h.className = 'pricehint'; }
+  }
+  $('price').addEventListener('input', updateHint);
+
+  /* ================= Att köpa (önskelista) =================
+  var linked = null, wishFilter = '';
+
+  function findWish(id) { return state.wishes.find(function (w) { return w.id === id; }); }
+  function people() {
+    var s = {}; state.wishes.forEach(function (w) { if (w.person) s[w.person] = 1; });
+    return Object.keys(s).sort(function (a, b) { return a.localeCompare(b, 'sv'); });
+  }
+  function showTab(name) {
+    var scan = name === 'scan';
+    $('paneScan').hidden = !scan; $('paneList').hidden = scan;
+    $('tabScanBtn').setAttribute('aria-selected', String(scan));
+    $('tabListBtn').setAttribute('aria-selected', String(!scan));
+    if (!scan && stream) stopCamera();
+    window.scrollTo(0, 0);
+  }
+  $('tabScanBtn').onclick = function () { showTab('scan'); };
+  $('tabListBtn').onclick = function () { showTab('list'); };
+
+  function setLink(id) {
+    linked = id;
+    var w = id && findWish(id);
+    $('linkBanner').hidden = !w;
+    if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '');
+  }
+  $('linkCancel').onclick = function () { setLink(null); };
+
+  function renderWishes() {
+    var ws = state.wishes, done = ws.filter(function (w) { return w.done; }).length, left = ws.length - done;
+    $('tabListBtn').textContent = 'Att köpa' + (left > 0 ? ' (' + left + ')' : '');
+    $('wishCount').textContent = ws.length ? done + ' av ' + ws.length + ' klara' : '';
+    $('wishEmpty').hidden = ws.length > 0;
+    $('wShare').hidden = !ws.length;
+    $('wClearDone').hidden = !done;
+
+    var ppl = people();
+    if (wishFilter && ppl.indexOf(wishFilter) < 0 && wishFilter !== '__none') wishFilter = '';
+    var dl = $('peopleList'); dl.innerHTML = '';
+    ppl.forEach(function (p) { var o = document.createElement('option'); o.value = p; dl.appendChild(o); });
+
+    var fc = $('wishFilter'); fc.innerHTML = '';
+    if (ppl.length > 1) {
+      [''].concat(ppl).forEach(function (p) {
+        var b = document.createElement('button'); b.type = 'button';
+        b.textContent = p || 'Alla'; b.setAttribute('aria-pressed', String(wishFilter === p));
+        b.onclick = function () { wishFilter = p; renderWishes(); };
+        fc.appendChild(b);
+      });
+    }
+
+    var hide = $('hideDone').checked, groups = {}, order = ppl.slice();
+    ws.forEach(function (w) {
+      if (hide && w.done) return;
+      if (wishFilter && w.person !== wishFilter) return;
+      var key = w.person || 'Övrigt';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(w);
+    });
+    if (order.indexOf('Övrigt') < 0) order.push('Övrigt');
+    var box = $('wishes'); box.innerHTML = '';
+    order.forEach(function (key) {
+      var arr = groups[key]; if (!arr) return;
+      arr.sort(function (a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); });
+      var sec = document.createElement('div'); sec.className = 'wishgroup';
+      var h = document.createElement('h3'), left2 = arr.filter(function (w) { return !w.done; }).length;
+      h.textContent = key; var sm = document.createElement('small'); sm.textContent = left2 + ' kvar'; h.appendChild(sm);
+      sec.appendChild(h);
+      arr.forEach(function (w) {
+        var row = document.createElement('div'); row.className = 'wish' + (w.done ? ' done' : '');
+        var chk = document.createElement('button'); chk.className = 'check'; chk.setAttribute('role', 'checkbox');
+        chk.setAttribute('aria-checked', String(w.done)); chk.setAttribute('aria-label', 'Klar: ' + w.text);
+        chk.textContent = w.done ? '✓' : '';
+        chk.onclick = function () {
+          snap((w.done ? 'avmarkerade ' : 'bockade av ') + w.text);
+          w.done = !w.done; save(); render();
+        };
+        var txt = document.createElement('button'); txt.className = 'txt'; txt.textContent = w.text;
+        txt.onclick = function () { openWish(w.id); };
+        var wrap = document.createElement('div'); wrap.className = 'wtxt';
+        if (w.img) wrap.appendChild(makeThumb(w.img));
+        wrap.appendChild(txt);
+        row.appendChild(chk); row.appendChild(wrap);
+        if (!w.done) {
+          var buy = document.createElement('button'); buy.className = 'buy'; buy.textContent = 'Köp';
+          buy.setAttribute('aria-label', 'Skanna pris för ' + w.text);
+          buy.onclick = function () {
+            setLink(w.id); $('name').value = w.text; $('img').value = w.img || ''; showTab('scan');
+            setStatus('Skanna priset för: ' + w.text);
+          };
+          row.appendChild(buy);
+        } else { row.appendChild(document.createElement('span')); }
+        var more = document.createElement('button'); more.className = 'more'; more.textContent = '…';
+        more.setAttribute('aria-label', 'Ändra ' + w.text); more.onclick = function () { openWish(w.id); };
+        row.appendChild(more);
+        sec.appendChild(row);
+      });
+      box.appendChild(sec);
+    });
+  }
+  $('hideDone').onchange = renderWishes;
+
+  function addWish() {
+    var t = $('wText').value.trim(); if (!t) { $('wText').focus(); return; }
+    var person = $('wPerson').value.trim(), wimg = safeUrl($('wImg').value);
+    snap('la till i listan: ' + t);
+    state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg });
+    save(); render(); toast('Tillagd i listan: ' + t, true);
+    $('wText').value = ''; $('wImg').value = ''; $('wText').focus();
+  }
+  $('wAdd').onclick = addWish;
+  $('wText').addEventListener('keydown', function (e) { if (e.key === 'Enter') addWish(); });
+
+  /* Ändra / ta bort önskning */
+  var editWish = null;
+  function openWish(id) {
+    var w = findWish(id); if (!w) return; editWish = id;
+    $('wEditText').value = w.text; $('wEditPerson').value = w.person; $('wEditImg').value = w.img || ''; $('wishDlg').showModal();
+  }
+  $('wEditCancel').onclick = function () { $('wishDlg').close(); };
+  $('wishForm').onsubmit = function () {
+    var w = findWish(editWish), t = $('wEditText').value.trim(); if (!w || !t) return;
+    snap('ändrade ' + w.text); w.text = t; w.person = $('wEditPerson').value.trim(); w.img = safeUrl($('wEditImg').value);
+    save(); render(); toast('Sparade ändringen', true);
+  };
+  $('wEditDelete').onclick = function () {
+    var w = findWish(editWish); if (!w) return;
+    snap('tog bort ' + w.text);
+    state.wishes = state.wishes.filter(function (x) { return x.id !== editWish; });
+    if (linked === editWish) setLink(null);
+    $('wishDlg').close(); save(); render(); toast('Tog bort ' + w.text, true);
+  };
+
+  /* Klistra in flera */
+  $('wBulk').onclick = function () { $('bText').value = ''; $('bPerson').value = $('wPerson').value; $('bulkDlg').showModal(); };
+  $('bulkCancel').onclick = function () { $('bulkDlg').close(); };
+  $('bulkForm').onsubmit = function () {
+    var cur = $('bPerson').value.trim(), n = 0, add = [];
+    $('bText').value.split('\n').forEach(function (line) {
+      line = line.trim(); if (!line) return;
+      var head = line.match(/^([^:]{1,30}):$/);
+      if (head) { cur = head[1].trim(); return; }
+      line = line.replace(/^[-*•·\u2022]+\s*/, '').replace(/^\d+[.)]\s+/, '').trim();
+      var um = line.match(/\s*(\S+\.\S+)\s*$/), url = '';
+      if (um && safeUrl(um[1]) && /^(https?:\/\/|www\.)/i.test(um[1])) { url = safeUrl(um[1]); line = line.slice(0, um.index).trim(); }
+      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url }); n++; }
+    });
+    if (!n) return;
+    snap('la till ' + n + ' i listan');
+    state.wishes = state.wishes.concat(add); save(); render(); toast('La till ' + n + ' saker', true);
+  };
+
+  /* Dela / ta bort klara */
+  $('wShare').onclick = function () {
+    var lines = [], ppl = people().concat(['']);
+    ppl.forEach(function (p) {
+      var arr = state.wishes.filter(function (w) { return (w.person || '') === p; });
+      if (!arr.length) return;
+      lines.push((p || 'Övrigt') + ':');
+      arr.forEach(function (w) { lines.push((w.done ? '[x] ' : '[ ] ') + w.text + (w.img ? ' ' + w.img : '')); });
+      lines.push('');
+    });
+    var text = lines.join('\n').trim();
+    if (navigator.share) navigator.share({ title: 'Att köpa på Ullared', text: text }).catch(function () {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast('Listan är kopierad', false); });
+    else prompt('Kopiera listan:', text);
+  };
+  $('wClearDone').onclick = function () {
+    snap('tog bort klara'); state.wishes = state.wishes.filter(function (w) { return !w.done; });
+    save(); render(); toast('Tog bort klara', true);
+  };
+
+  render();
+  if (!state.items.length && state.wishes.length) showTab('list');
+})();
+</script>
+</body>
+</html>
