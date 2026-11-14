@@ -19,7 +19,7 @@
     --tag:#ffd166; --tag-ink:#21184f;          /* månljus: totalsumma, huvudknapp */
     --accent:#b9a5ff; --accent-ink:#1b1446;    /* lila: vanliga knappar, valt läge */
     --red:#ff9db0; --green:#8ff0b4;
-    --radius:18px; --radius-s:12px;
+    --radius:6px; --radius-s:6px; --pill:999px;
   }
   * { box-sizing:border-box; }
   html,body { margin:0; }
@@ -57,7 +57,7 @@
   /* Kamera */
   .camera { position:relative; border-radius:var(--radius); overflow:hidden; background:#0b0820; aspect-ratio:4/3; border:1px solid var(--line); }
   .camera video { width:100%; height:100%; object-fit:cover; display:block; }
-  .frame { position:absolute; left:15%; right:15%; top:32%; bottom:32%; border:3px solid var(--tag); border-radius:14px;
+  .frame { position:absolute; left:15%; right:15%; top:32%; bottom:32%; border:3px solid var(--tag); border-radius:var(--radius);
     box-shadow:0 0 0 999px rgba(12,8,36,.5); pointer-events:none; }
   .cam-msg { position:absolute; inset:0; display:none; place-items:center; text-align:center; color:var(--ink); padding:20px; font-size:14px; }
   .cam-msg.show { display:grid; }
@@ -68,7 +68,7 @@
 
   /* Knappar */
   .row { display:flex; gap:10px; margin-top:10px; }
-  .btn { flex:1; min-height:44px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-weight:700; }
+  .btn { flex:1; min-height:44px; border-radius:var(--pill); border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-weight:700; }
   .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
   .btn.red { background:var(--tag); border-color:var(--tag); color:var(--tag-ink); box-shadow:0 6px 20px rgba(255,209,102,.18); }
   .btn:disabled { opacity:.45; }
@@ -90,7 +90,7 @@
 
   /* Listor */
   .listhead { display:flex; justify-content:space-between; align-items:center; margin:22px 0 4px; }
-  h2 { font-size:16px; font-weight:700; margin:0; }
+  h2 { font-size:19px; font-weight:700; margin:0; }
   ul { list-style:none; margin:0; padding:0; }
   li.item { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; padding:10px 12px; margin-top:8px;
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
@@ -109,9 +109,9 @@
     border-radius:var(--radius); padding:8px 8px 8px 16px; display:none; align-items:center; gap:10px; z-index:30; }
   .toast.show { display:flex; }
   .toast span { flex:1; font-size:14px; }
-  .toast button { min-height:44px; padding:0 16px; border-radius:var(--radius-s); border:0; background:var(--tag); color:var(--tag-ink); font-weight:700; }
+  .toast button { min-height:44px; padding:0 16px; border-radius:var(--pill); border:0; background:var(--tag); color:var(--tag-ink); font-weight:700; }
 
-  dialog { border:1px solid var(--line); border-radius:22px; padding:20px; width:min(92vw,420px); background:var(--solid); color:var(--ink);
+  dialog { border:1px solid var(--line); border-radius:var(--radius); padding:20px; width:min(92vw,420px); background:var(--solid); color:var(--ink);
     box-shadow:0 20px 60px rgba(0,0,0,.5); }
   dialog::backdrop { background:rgba(8,5,25,.7); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
   dialog .row .btn { min-height:44px; }
@@ -134,7 +134,7 @@
 
   .linkbanner { display:flex; align-items:center; gap:8px; background:var(--tag); color:var(--tag-ink); border-radius:var(--radius-s); padding:8px 8px 8px 14px; margin-bottom:12px; font-weight:700; }
   .linkbanner span { flex:1; }
-  .linkbanner button { min-height:44px; padding:0 14px; border-radius:10px; border:0; background:var(--tag-ink); color:var(--tag); font-weight:700; }
+  .linkbanner button { min-height:44px; padding:0 14px; border-radius:var(--pill); border:0; background:var(--tag-ink); color:var(--tag); font-weight:700; }
 
   /* Önskelistan */
   .wishadd { display:grid; gap:12px; }
@@ -176,7 +176,7 @@
   .seg button[aria-pressed=true] { background:var(--accent); color:var(--accent-ink); }
   .grouphead { margin-top:22px; padding:0 4px; }
   .wishgroup .grouphead { margin-top:0; }
-  .grouphead h3 { font-size:15px; font-weight:700; margin:0; display:flex; justify-content:space-between; gap:10px; }
+  .grouphead h3 { font-size:17px; font-weight:700; margin:0; display:flex; justify-content:space-between; gap:10px; }
   .grouphead h3 small { color:var(--muted); font-weight:500; font-size:13px; white-space:nowrap; }
   .grouphead .where { font-size:12px; color:var(--accent); margin:2px 0 0; }
   .picklist { display:grid; gap:6px; max-height:60vh; overflow:auto; margin:12px 0; padding:2px; }
@@ -189,7 +189,7 @@
   select { width:100%; font:inherit; font-size:16px; min-height:44px; padding:6px 12px; border:1px solid var(--line); border-radius:var(--radius-s); background:rgba(10,7,30,.35); color:var(--ink); }
   select option { background:var(--solid); color:var(--ink); }
   .deptrow { display:grid; grid-template-columns:44px 44px 1fr 44px; gap:6px; align-items:center; padding:5px 0; border-bottom:1px solid var(--line); }
-  .deptrow button { width:44px; height:44px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface-2); font-weight:700; font-size:15px; }
+  .deptrow button { width:44px; height:44px; border-radius:var(--pill); border:1px solid var(--line); background:var(--surface-2); font-weight:700; font-size:15px; }
   .deptrow button:disabled { opacity:.3; }
   .deptrow input { font-size:16px !important; padding:8px 10px !important; }
   .deptrow .del { color:var(--red); border-color:rgba(255,157,176,.5); }
@@ -199,7 +199,7 @@
   .fold { padding:0 14px; }
   .fold[open] { padding-bottom:14px; }
   .visit { margin-top:0; }
-  .fold summary { display:flex; align-items:center; gap:8px; min-height:48px; cursor:pointer; list-style:none; font-weight:600; font-size:15px; }
+  .fold summary { display:flex; align-items:center; gap:8px; min-height:50px; cursor:pointer; list-style:none; font-weight:600; font-size:17px; }
   .fold summary::-webkit-details-marker { display:none; }
   .fold summary::after { content:""; width:8px; height:8px; margin-left:auto; flex:none; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
     transform:rotate(45deg) translateY(-2px); transition:transform .15s; }
@@ -223,7 +223,7 @@
     background:rgba(255,209,102,.1); border:1px solid rgba(255,209,102,.35); font-size:13px; }
   .tip span { flex:1; }
   .tip .btn { flex:none; padding:0 14px; }
-  .bk-h { font-size:15px; margin:18px 0 0; }
+  .bk-h { font-size:17px; margin:18px 0 0; }
   #backupDlg textarea { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:16px; word-break:break-all; }
   /* Maxpris på önskningar */
   .wmeta .maxp { font-size:12px; color:var(--tag); font-weight:600; }
