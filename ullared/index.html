@@ -99,7 +99,6 @@
   .item .line { font-weight:700; font-size:16px; font-variant-numeric:tabular-nums; text-align:right; }
   .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:8px; }
   .item .acts button { min-width:44px; height:44px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface-2); font-weight:700; font-size:15px; }
-  .item .acts .edit { margin-left:auto; font-size:14px; padding:0 14px; flex:none; }
   .item .acts .n { white-space:nowrap; min-width:32px; text-align:center; }
   .empty { color:var(--muted); padding:14px 0; }
   .tools { display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:12px; }
@@ -142,7 +141,7 @@
   /* Önskelistan */
   .wishadd { display:grid; gap:12px; }
   .wishgroup { margin-top:20px; }
-  .wish { display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; align-items:center; padding:10px 12px; margin-top:8px;
+  .wish { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:10px 12px; margin-top:8px;
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
   .wish .check { width:44px; height:44px; border-radius:50%; border:2px solid var(--accent); background:none; font-size:16px; font-weight:700; line-height:1; color:var(--accent-ink); }
   .wish .check[aria-checked=true] { background:var(--green); border-color:var(--green); color:#0f2a1c; }
@@ -151,7 +150,6 @@
   .wish.done { opacity:.7; }
   .wish.done .txt { text-decoration:line-through; color:var(--muted); font-weight:500; }
   .wish .buy { min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--tag); background:none; color:var(--tag); font-weight:700; }
-  .wish .more { width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2); font-size:15px; font-weight:700; }
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .filters button { min-height:44px; padding:0 16px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-weight:600; }
   .filters button[aria-pressed=true] { background:var(--surface-2); color:var(--ink); border-color:var(--accent); }
@@ -732,25 +730,23 @@
       var li = document.createElement('li'); li.className = 'item';
       li.innerHTML = '<div class="info"><div class="meta"><button class="name"></button><div class="calc"></div><span class="badge" hidden></span></div></div><div class="line"></div>' +
         '<div class="acts"><button aria-label="Minska antal">−</button><span class="n"></span>' +
-        '<button aria-label="Öka antal">+</button><button class="edit">Ändra</button></div>';
+        '<button aria-label="Öka antal">+</button></div>';
       li.querySelector('.name').textContent = it.name || 'Namnlös vara';
+      li.querySelector('.name').setAttribute('aria-label', 'Ändra ' + (it.name || 'namnlös vara') + ', ' + fmt(it.price));
       li.querySelector('.calc').textContent = it.qty + ' × ' + fmt(it.price);
       li.querySelector('.line').textContent = fmt(it.price * it.qty);
       li.querySelector('.n').textContent = it.qty + ' st';
       if (it.img) { var inf = li.querySelector('.info'); inf.insertBefore(makeThumb(it.img), inf.firstChild); }
       if (state.limit > 0 && it.price < state.limit) { var bd = li.querySelector('.badge'); bd.hidden = false; bd.textContent = 'Under ' + fmt(state.limit); }
-      var b = li.querySelectorAll('.acts button');   // − + Ändra (inte namnknappen)
+      var b = li.querySelectorAll('.acts button');   // − + (inte namnknappen; tryck på namnet för att ändra)
       b[0].onclick = function () { // −
         if (it.qty > 1) { snap('minskade ' + label(it)); it.qty--; toast(label(it) + ': ' + it.qty + ' st', true); }
         else { snap('tog bort ' + label(it)); state.items = state.items.filter(function (x) { return x !== it; }); toast('Tog bort ' + label(it), true); }
         save(); render();
       };
       b[1].onclick = function () { snap('ökade ' + label(it)); it.qty++; save(); render(); };
-      b[2].onclick = function () { openEdit(it.id); };
       li.querySelector('.name').onclick = function () { openEdit(it.id); };
-      var acts = li.querySelector('.acts');
-      acts.appendChild(deptChip(it, label(it)));
-      acts.appendChild(b[2]);   // Ändra längst till höger
+      li.querySelector('.acts').appendChild(deptChip(it, label(it)));
       return li;
   }
   $('search').oninput = render;
@@ -1249,6 +1245,7 @@
           w.done = !w.done; save(); render();
         };
         var txt = document.createElement('button'); txt.className = 'txt'; txt.textContent = w.text;
+        txt.setAttribute('aria-label', 'Ändra ' + w.text);
         txt.onclick = function () { openWish(w.id); };
         var wrap = document.createElement('div'); wrap.className = 'wtxt';
         if (w.img) wrap.appendChild(makeThumb(w.img));
@@ -1268,9 +1265,6 @@
           };
           row.appendChild(buy);
         } else { row.appendChild(document.createElement('span')); }
-        var more = document.createElement('button'); more.className = 'more'; more.textContent = '…';
-        more.setAttribute('aria-label', 'Ändra ' + w.text); more.onclick = function () { openWish(w.id); };
-        row.appendChild(more);
         sec.appendChild(row);
       });
       box.appendChild(sec);
