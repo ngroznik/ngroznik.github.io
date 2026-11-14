@@ -194,6 +194,27 @@
   .deptrow .del { color:var(--red); border-color:rgba(255,157,176,.5); }
   .depts-scroll { max-height:55vh; overflow:auto; margin:10px 0; }
   .addrow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  /* Kundvagn & parkering */
+  .visit { padding:0 14px; margin-top:0; }
+  .visit summary { display:flex; align-items:center; gap:8px; min-height:48px; cursor:pointer; list-style:none; font-weight:600; font-size:15px; }
+  .visit summary::-webkit-details-marker { display:none; }
+  .visit summary::after { content:""; width:8px; height:8px; margin-left:auto; flex:none; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+    transform:rotate(45deg) translateY(-2px); transition:transform .15s; }
+  .visit[open] summary::after { transform:rotate(-135deg) translateY(-2px); }
+  .visit .vtitle { white-space:nowrap; flex:none; }
+  .visit .vsum { font-size:13px; font-weight:500; color:var(--tag); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .visit[open] .vsum { display:none; }
+  .visit .vfields { display:grid; grid-template-columns:1fr 1.6fr; gap:10px; }
+  .visit .row { margin-top:12px; }
+  .visit .vgeo { font-size:13px; color:var(--muted); margin:8px 0 0; min-height:18px; }
+  .visit .vgeo.warn { color:var(--red); }
+  .visit .linkbtn { padding:0; }
+  .visit { padding-bottom:4px; }
+  .visit:not([open]) { padding-bottom:0; }
+  a.linkbtn-btn { display:flex; align-items:center; justify-content:center; text-decoration:none; background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  a.linkbtn-btn[aria-disabled=true] { background:var(--surface-2); border-color:var(--line); color:var(--muted); opacity:.6; cursor:not-allowed; }
+  #cartHead { margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--surface-2); color:var(--tag); font-weight:600; font-size:12px; }
+  .camera { margin-top:12px; }
   .addrow .btn { min-height:44px; padding:0 16px; }
 </style>
 </head>
@@ -202,7 +223,7 @@
 <div class="total">
   <div class="top">
     <div class="sum" id="sum" aria-live="polite">0 kr</div>
-    <div class="label"><span id="countTxt">0 varor</span></div>
+    <div class="label"><span id="countTxt">0 varor</span><span id="cartHead" hidden></span></div>
   </div>
   <div class="budgetline" id="budgetLine" aria-live="polite"></div>
   <div class="bar" id="bar"><i></i></div>
@@ -215,6 +236,27 @@
 
 <main>
 <section id="paneScan">
+  <details class="card visit" id="visitCard">
+    <summary><span class="vtitle">Kundvagn &amp; parkering</span><span class="vsum" id="visitSum"></span></summary>
+    <div class="vfields">
+      <div>
+        <label for="visitCart">Kundvagnsnummer</label>
+        <input type="text" id="visitCart" autocomplete="off" placeholder="t.ex. 1234">
+      </div>
+      <div>
+        <label for="visitPark">Parkering</label>
+        <input type="text" id="visitPark" autocomplete="off" placeholder="t.ex. Gul zon, rad 14">
+      </div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="visitSave">Spara plats</button>
+      <a class="btn linkbtn-btn" id="visitFind" target="_blank" rel="noopener noreferrer" role="link" aria-disabled="true">Hitta bilen</a>
+    </div>
+    <p class="vgeo" id="visitGeo" role="status"></p>
+    <p class="small" style="margin-top:4px">Platsen sparas bara på telefonen. Den skickas ingenstans förrän du själv trycker på Hitta bilen och öppnar kartan.</p>
+    <button type="button" class="linkbtn" id="visitClear">Rensa</button>
+  </details>
+
   <div class="camera">
     <video id="video" playsinline muted autoplay></video>
     <div class="frame" aria-hidden="true"></div>
@@ -482,6 +524,9 @@
     if (s.view.items !== 'recent' && s.view.items !== 'dept') s.view.items = 'recent';
     s.items.forEach(function (i) { if (typeof i.dept !== 'string') i.dept = ''; });
     s.wishes.forEach(function (w) { if (typeof w.dept !== 'string') w.dept = ''; });
+    var v = s.visit && typeof s.visit === 'object' ? s.visit : {};
+    s.visit = { cartNo: typeof v.cartNo === 'string' ? v.cartNo : '', parking: typeof v.parking === 'string' ? v.parking : '',
+      geo: v.geo && isFinite(v.geo.lat) && isFinite(v.geo.lng) ? { lat: +v.geo.lat, lng: +v.geo.lng, ts: +v.geo.ts || 0, acc: +v.geo.acc || 0 } : null };
     s.version = VERSION;
     return s;
   }
@@ -517,6 +562,67 @@
   }
   $('toastUndo').onclick = function () { $('toast').classList.remove('show'); undo(); };
 
+  /* ---------- Kundvagn & parkering ---------- */
+  function renderVisit() {
+    var v = state.visit, cart = $('visitCart'), park = $('visitPark');
+    if (document.activeElement !== cart) cart.value = v.cartNo;
+    if (document.activeElement !== park) park.value = v.parking;
+    $('cartHead').hidden = !v.cartNo; $('cartHead').textContent = v.cartNo ? 'Vagn ' + v.cartNo : '';
+    var parts = [];
+    if (v.cartNo) parts.push('Vagn ' + v.cartNo);
+    if (v.parking) parts.push(v.parking); else if (v.geo) parts.push('Plats sparad');
+    $('visitSum').textContent = parts.join(' · ');
+    var find = $('visitFind');
+    if (v.geo) {
+      find.href = 'https://www.google.com/maps?q=' + v.geo.lat.toFixed(6) + ',' + v.geo.lng.toFixed(6);
+      find.setAttribute('aria-disabled', 'false'); find.removeAttribute('tabindex');
+    } else {
+      find.removeAttribute('href'); find.setAttribute('aria-disabled', 'true'); find.setAttribute('tabindex', '-1');
+    }
+    var g = $('visitGeo');
+    if (!g.classList.contains('warn')) {
+      g.textContent = v.geo ? 'Plats sparad ' + new Date(v.geo.ts).toLocaleString('sv-SE', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) +
+        (v.geo.acc ? ' (± ' + Math.round(v.geo.acc) + ' m)' : '') : '';
+    }
+    $('visitClear').hidden = !(v.cartNo || v.parking || v.geo);
+  }
+  function setVisitField(key, input, what) {
+    var val = input.value.trim();
+    if (val === state.visit[key]) return;
+    snap('ändrade ' + what);
+    state.visit[key] = val; save(); render();
+  }
+  $('visitCart').addEventListener('change', function () { setVisitField('cartNo', this, 'kundvagnsnummer'); });
+  $('visitPark').addEventListener('change', function () { setVisitField('parking', this, 'parkering'); });
+  [$('visitCart'), $('visitPark')].forEach(function (el) {
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  });
+  function geoMsg(t) { var g = $('visitGeo'); g.textContent = t; g.classList.toggle('warn', !!t); }
+  $('visitSave').onclick = function () {
+    var btn = this;
+    if (!navigator.geolocation || !window.isSecureContext) { geoMsg('Platsen går inte att hämta här. Skriv parkeringen i fältet ovan.'); return; }
+    btn.disabled = true; btn.textContent = 'Hämtar plats…'; geoMsg('');
+    navigator.geolocation.getCurrentPosition(function (p) {
+      btn.disabled = false; btn.textContent = 'Spara plats';
+      snap('sparade platsen');
+      state.visit.geo = { lat: p.coords.latitude, lng: p.coords.longitude, ts: Date.now(), acc: p.coords.accuracy || 0 };
+      save(); render(); toast('Platsen är sparad', true);
+    }, function (err) {
+      btn.disabled = false; btn.textContent = 'Spara plats';
+      geoMsg(err && err.code === 1
+        ? 'Platsåtkomst är nekad. Skriv parkeringen i fältet ovan, eller tillåt plats för webbläsaren i telefonens inställningar.'
+        : 'Kunde inte hitta platsen just nu. Försök igen utomhus, eller skriv parkeringen i fältet ovan.');
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  };
+  $('visitFind').addEventListener('click', function (e) { if (!state.visit.geo) e.preventDefault(); });
+  $('visitClear').onclick = function () {
+    if (!confirm('Rensa kundvagnsnummer, parkering och sparad plats? Du kan ångra direkt efteråt.')) return;
+    snap('rensade kundvagn och parkering');
+    state.visit = { cartNo: '', parking: '', geo: null }; geoMsg('');
+    save(); render(); toast('Kundvagn och parkering rensade', true);
+  };
+  $('visitCard').open = !(state.visit.cartNo || state.visit.parking || state.visit.geo);
+
   /* ---------- Render ---------- */
   function total() { return state.items.reduce(function (s, i) { return s + i.price * i.qty; }, 0); }
   function render() {
@@ -524,6 +630,7 @@
     $('sum').textContent = fmt(sum);
     $('countTxt').textContent = count + (count === 1 ? ' vara' : ' varor') + ' i korgen';
     renderWishes();
+    renderVisit();
     updateHint();
 
     var bl = $('budgetLine'), bar = $('bar');
