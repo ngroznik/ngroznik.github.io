@@ -59,32 +59,33 @@ Avdelningarna finns på användarens konto på Ditt Gekås. Claude Code (eller C
 
 ```json
 [
-  { "id": "barnklader", "name": "Barnkläder", "floor": 1, "order": 1, "keywords": ["barn", "baby", "pyjamas"] }
+  { "id": "kroppsvard", "name": "Kroppsvård", "level": "Plan 1", "via": null, "cells": ["A1", "A2", "B1"], "color": "#f08a2a", "order": 1, "sections": ["Hårvård", "Munvård"] }
 ]
 ```
 
 - `id`: kort, utan mellanslag eller å/ä/ö.
 - `order`: standardordning genom varuhuset, 1 är först.
-- `keywords`: ord som får en vara att hamna här. Börja enkelt, användaren kan utöka dem.
-- Om våning eller ordning inte går att hämta, lämna `floor` som `null` och sätt ordningen alfabetiskt. Användaren ändrar den sedan i appen.
+- `level`: planet ("Plan 1", "Nedre plan", "Övre plan", "Plan 2"). `via`: takkuben med trappan dit, eller `null` på Plan 1.
+- `cells`: takkuberna på Plan 1 som avdelningen täcker (rad A–K, kolumn 1–12). `color`: avdelningens färg på kartan. `sections`: undergrupper.
+- Källa: Gekås varuhuskarta (PDF, oktober 2026). Läget skrivs alltid över från standarddatan; namn och ordning är användarens.
 
 ## 5. Funktion 1: Avdelningar
 
 **Datamodell**
 - `state.departments`: lista enligt formatet ovan. Fylls från `avdelningar.json` första gången.
 - Varje vara och önskning får `dept` (id på avdelningen, eller tomt).
-- `state.deptLearn`: objekt som kopplar ett ord till en avdelning, som appen lär sig när användaren rättar en gissning.
 
 **Beteende**
-- När en vara eller önskning läggs till gissar appen avdelning utifrån `deptLearn` först, sedan `keywords`. Jämför på små bokstäver och prova enkel pluralhantering ("byxor" och "byxa"). Hittas ingen, sätt tomt.
-- Användaren kan alltid byta avdelning på en vara (i redigeringsrutan) och även direkt från raden med ett tryck. Ett byte sparas i `deptLearn`.
+- Användaren väljer avdelning själv i formuläret (valfritt). Appen gissar inte (gissningen ändrades bort i november 2026 eftersom den blev fel för ofta). På Skanna-sidan ligger valet kvar till nästa vara; "Köp" från listan fyller i önskningens avdelning.
+- Avdelningen kan bytas i redigeringsrutan och, i "Senaste först", direkt från raden.
+- **Karta:** en egen förenklad ritning av Plan 1 (takkuberna) och planen en trappa upp och ner. Avdelningens läge under varje rubrik och "Visa på kartan" vid avdelningsvalet öppnar kartan med avdelningen markerad. Knappen "Karta" visar alla; tryck på en ruta för att se namnet.
 - Önskelistan och korgen kan visas **grupperade efter avdelning i vandringsordning**. Våning visas vid varje avdelning om den finns. Det som saknar avdelning hamnar sist under "Övrigt".
 - Vyn växlas med en tydlig knapp: "Per person" (som idag) och "Per avdelning".
 - Inställning: ändra avdelningarnas ordning (flytta upp och ner), byt namn, lägg till och ta bort egna avdelningar, återställ standard.
-- Klistra in flera ska också gissa avdelning.
+- Klistra in flera har ett val för avdelning till alla raderna.
 
 **Klart när**
-- En vara med namnet "strumpor" hamnar på en rimlig avdelning utan att användaren gör något, och byts avdelning kommer appen ihåg det nästa gång.
+- En vald avdelning syns markerad på kartan med rätt takkuber.
 - Ändrar användaren ordningen syns den direkt i listan.
 - Ångra återställer ett byte av avdelning.
 - Gammal data från v2 öppnas utan fel och alla varor visas som "Övrigt".
@@ -109,7 +110,7 @@ Avdelningarna finns på användarens konto på Ditt Gekås. Claude Code (eller C
 ## 7. Funktion 3: Backup
 
 **Beteende**
-- **Exportera fil:** laddar ner `ullared-backup-ÅÅÅÅ-MM-DD.json` med hela tillståndet (varor, önskningar, budget, gräns, avdelningar, `deptLearn`, besöksuppgifter) samt `version` och `exportedAt`.
+- **Exportera fil:** laddar ner `ullared-backup-ÅÅÅÅ-MM-DD.json` med hela tillståndet (varor, önskningar, budget, gräns, avdelningar, besöksuppgifter) samt `version` och `exportedAt`.
 - **Kopiera som kod:** samma innehåll som text (JSON, gärna komprimerat och base64-kodat) som kan klistras in i ett meddelande eller en anteckning.
 - **Importera:** från fil eller inklistrad kod. Visa först en sammanfattning ("12 varor, 30 önskningar") och låt användaren välja **Slå ihop** (lägg till det som saknas, bedöm dubbletter på `id`) eller **Ersätt allt**.
 - Validera innan något skrivs: rätt struktur, rimliga värden, version som går att läsa. Vid fel, ändra ingenting och förklara vad som är fel.
@@ -130,13 +131,13 @@ Avdelningarna finns på användarens konto på Ditt Gekås. Claude Code (eller C
 
 ## 9. Utanför den här versionen
 
-Konton, server, livesynk mellan telefoner, inloggning mot Gekås, en officiell kartbild av varuhuset. Dessa kan tas senare (se nedan).
+Konton, server, livesynk mellan telefoner, inloggning mot Gekås. (Kartan är en egen ritning, inte Gekås kartbild.) Dessa kan tas senare (se nedan).
 
 ## 10. Test
 
 Prova på en riktig telefon (iPhone Safari och Android Chrome), över https:
 1. Starta med gammal v2-data och kontrollera att allt finns kvar.
-2. Lägg till varor, bekräfta avdelningsgissningen, rätta den, och kontrollera att den lärs in.
+2. Lägg till varor med avdelning och kontrollera att kartan visar rätt ställe.
 3. Spara plats, stäng appen, öppna den igen och använd "Hitta bilen".
 4. Exportera, rensa all webbplatsdata, importera, jämför.
 5. Mörkt läge, text i stor storlek (200 %), skärmläsare på nyckelflöden.
