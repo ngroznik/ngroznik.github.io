@@ -215,6 +215,13 @@
   a.linkbtn-btn[aria-disabled=true] { background:var(--surface-2); border-color:var(--line); color:var(--muted); opacity:.6; cursor:not-allowed; }
   #cartHead { margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--surface-2); color:var(--tag); font-weight:600; font-size:12px; }
   .camera { margin-top:12px; }
+  /* Backup */
+  .tip { display:flex; align-items:center; gap:10px; margin-top:16px; padding:10px 10px 10px 14px; border-radius:var(--radius);
+    background:rgba(255,209,102,.1); border:1px solid rgba(255,209,102,.35); font-size:13px; }
+  .tip span { flex:1; }
+  .tip .btn { flex:none; padding:0 14px; }
+  .bk-h { font-size:15px; margin:18px 0 0; }
+  #backupDlg textarea { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:16px; word-break:break-all; }
   /* Maxpris på önskningar */
   .wmeta .maxp { font-size:12px; color:var(--tag); font-weight:600; }
   .pricehint.over { color:var(--red); }
@@ -301,6 +308,11 @@
     <div class="row"><button class="btn red" id="addBtn">Lägg i korgen</button></div>
   </div>
 
+  <div class="tip" id="backupTip" hidden>
+    <span>Tips: ta en backup av korgen ifall telefonen strular.</span>
+    <button type="button" class="btn" id="backupTipBtn">Backup</button>
+  </div>
+
   <div class="listhead"><h2>Korgen</h2></div>
   <div class="seg" role="group" aria-label="Visa korgen" id="itemView" hidden>
     <button type="button" data-view="recent">Senaste först</button>
@@ -314,6 +326,7 @@
     <button class="linkbtn neutral" id="budgetBtn">Budget &amp; prisgräns</button>
     <button class="linkbtn neutral" id="shareBtn">Dela / kopiera lista</button>
     <button class="linkbtn neutral" id="deptSettingsBtn">Avdelningar</button>
+    <button class="linkbtn neutral" id="backupBtn">Backup</button>
     <button class="linkbtn" id="clearBtn">Töm korgen</button>
   </div>
 
@@ -357,6 +370,7 @@
   <div class="tools">
     <button class="linkbtn neutral" id="wShare">Dela listan</button>
     <button class="linkbtn neutral" id="deptSettingsBtn2">Avdelningar</button>
+    <button class="linkbtn neutral" id="backupBtn2">Backup</button>
     <button class="linkbtn" id="wClearDone">Ta bort klara</button>
   </div>
 </section>
@@ -428,6 +442,42 @@
       <button type="submit" class="btn primary">Lägg till</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="backupDlg" aria-labelledby="backupTitle">
+  <h2 id="backupTitle">Backup</h2>
+  <div id="bkMain">
+    <p class="small" style="margin-top:0">Spara allt (korg, lista, avdelningar, kundvagn och parkering) som en fil eller som en kod du kan klistra in i ett meddelande till dig själv.</p>
+    <div class="row">
+      <button type="button" class="btn primary" id="bkExportFile">Exportera fil</button>
+      <button type="button" class="btn" id="bkCopyCode">Kopiera som kod</button>
+    </div>
+    <p class="vgeo" id="bkExportMsg" role="status"></p>
+    <textarea id="bkCodeOut" readonly hidden aria-label="Backupkod" style="min-height:90px"></textarea>
+
+    <h3 class="bk-h">Importera</h3>
+    <div class="row" style="margin-top:6px">
+      <button type="button" class="btn" id="bkPickFile">Välj fil</button>
+      <input type="file" id="bkFile" accept=".json,application/json,text/plain" class="sr" tabindex="-1" aria-hidden="true">
+    </div>
+    <label for="bkCodeIn" style="margin-top:10px">eller klistra in en kod</label>
+    <textarea id="bkCodeIn" style="min-height:90px" autocomplete="off" spellcheck="false"></textarea>
+    <div class="row"><button type="button" class="btn" id="bkReadCode">Läs in koden</button></div>
+    <p class="vgeo warn" id="bkError" role="alert"></p>
+  </div>
+
+  <div id="bkConfirm" hidden>
+    <p id="bkSummary" style="margin:4px 0 2px; font-weight:600"></p>
+    <p class="small" id="bkWhen" style="margin-top:0"></p>
+    <p class="small"><b>Slå ihop</b> lägger till det som saknas och behåller det du har. <b>Ersätt allt</b> byter ut allt mot backupen. Båda går att ångra.</p>
+    <div class="row">
+      <button type="button" class="btn primary" id="bkMerge">Slå ihop</button>
+      <button type="button" class="btn" id="bkReplace">Ersätt allt</button>
+    </div>
+    <div class="row"><button type="button" class="btn" id="bkBack">Tillbaka</button></div>
+  </div>
+
+  <div class="row"><button type="button" class="btn" id="bkClose">Stäng</button></div>
 </dialog>
 
 <dialog id="deptDlg" aria-labelledby="deptDlgTitle">
@@ -539,6 +589,7 @@
     var v = s.visit && typeof s.visit === 'object' ? s.visit : {};
     s.visit = { cartNo: typeof v.cartNo === 'string' ? v.cartNo : '', parking: typeof v.parking === 'string' ? v.parking : '',
       geo: v.geo && isFinite(v.geo.lat) && isFinite(v.geo.lng) ? { lat: +v.geo.lat, lng: +v.geo.lng, ts: +v.geo.ts || 0, acc: +v.geo.acc || 0 } : null };
+    if (!(typeof s.lastExport === 'number' && s.lastExport > 0)) s.lastExport = 0;
     s.version = VERSION;
     return s;
   }
@@ -643,6 +694,7 @@
     $('countTxt').textContent = count + (count === 1 ? ' vara' : ' varor') + ' i korgen';
     renderWishes();
     renderVisit();
+    $('backupTip').hidden = !(state.items.length > 10 && (!state.lastExport || Date.now() - state.lastExport > 24 * 3600 * 1000));
     updateHint();
 
     var bl = $('budgetLine'), bar = $('bar');
@@ -1319,6 +1371,227 @@
   $('wClearDone').onclick = function () {
     snap('tog bort klara'); state.wishes = state.wishes.filter(function (w) { return !w.done; });
     save(); render(); toast('Tog bort klara', true);
+  };
+
+  /* ================= Backup: export och import ================= */
+  var APP_ID = 'ullared-kassa', pendingImport = null;
+
+  // Standardavdelningar sparas bara som skillnader (ordning, namn …); sökorden kommer alltid från appen.
+  function compactDepts(list) {
+    return list.map(function (d) {
+      var def = d.custom ? null : DEFAULT_DEPTS.find(function (x) { return x.id === d.id; });
+      if (!def) return d;
+      var o = { id: d.id };
+      Object.keys(d).forEach(function (k) { if (k !== 'keywords' && JSON.stringify(d[k]) !== JSON.stringify(def[k])) o[k] = d[k]; });
+      return o;
+    });
+  }
+  function expandDepts(list) {
+    return list.map(function (d) {
+      var def = d && !d.custom ? DEFAULT_DEPTS.find(function (x) { return x.id === d.id; }) : null;
+      if (!def) return d;
+      var o = JSON.parse(JSON.stringify(def));
+      Object.keys(d).forEach(function (k) { o[k] = d[k]; });
+      return o;
+    });
+  }
+  function backupData() {
+    return { app: APP_ID, version: VERSION, exportedAt: new Date().toISOString(),
+      items: state.items, wishes: state.wishes, budget: state.budget, limit: state.limit,
+      departments: compactDepts(state.departments), deptFormat: 'diff', deptLearn: state.deptLearn,
+      visit: state.visit, view: state.view, lastExport: state.lastExport };
+  }
+
+  /* Kontroll av en backup. Kastar ett fel med en begriplig förklaring; ändrar aldrig nuvarande data. */
+  function fail(msg) { throw new Error(msg); }
+  function str(v, max) { return typeof v === 'string' ? v.slice(0, max) : ''; }
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : NaN; }
+  function uniqueId(id, seen) { id = str(id, 80) || uid(); while (seen[id]) id = id + '-' + uid().slice(-3); seen[id] = 1; return id; }
+  function readBackup(o) {
+    if (Array.isArray(o)) o = { items: o.map(function (x) { return x && { price: x.price, qty: x.qty }; }) };   // v1: bara en lista
+    if (!o || typeof o !== 'object') fail('Det här ser inte ut som en backup från Ullared-kassan.');
+    if (o.app !== undefined && o.app !== APP_ID) fail('Det här är en backup från en annan app.');
+    if (o.version !== undefined && !(num(o.version) >= 1)) fail('Versionen i backupen går inte att läsa.');
+    if (o.version > VERSION) fail('Backupen kommer från en nyare version av appen (v' + o.version + '). Ladda om sidan och försök igen.');
+    if (!Array.isArray(o.items) && !Array.isArray(o.wishes)) fail('Hittade varken varor eller önskningar i backupen.');
+    var items = o.items === undefined ? [] : o.items, wishes = o.wishes === undefined ? [] : o.wishes;
+    if (!Array.isArray(items) || !Array.isArray(wishes)) fail('Varor och önskningar måste vara listor.');
+    if (items.length > 5000 || wishes.length > 5000) fail('Backupen är orimligt stor.');
+    var s = {}, seen = {};
+    s.items = items.map(function (it, i) {
+      var nm = it && typeof it.name === 'string' && it.name ? ' (' + it.name.slice(0, 40) + ')' : '';
+      if (!it || typeof it !== 'object') fail('Vara ' + (i + 1) + ' är trasig.');
+      var p = num(it.price), q = num(it.qty);
+      if (!(p > 0 && p < 100000)) fail('Vara ' + (i + 1) + nm + ' har ett orimligt pris.');
+      if (!(q >= 1 && q <= 999 && Math.floor(q) === q)) fail('Vara ' + (i + 1) + nm + ' har ett orimligt antal.');
+      return { id: uniqueId(it.id, seen), name: str(it.name, 200), price: p, qty: q, img: safeUrl(it.img), dept: str(it.dept, 80) };
+    });
+    seen = {};
+    s.wishes = wishes.map(function (w, i) {
+      if (!w || typeof w !== 'object' || typeof w.text !== 'string' || !w.text.trim()) fail('Önskning ' + (i + 1) + ' saknar text.');
+      var mx = w.max === undefined ? 0 : num(w.max);
+      if (!(mx >= 0 && mx < 100000)) fail('Önskningen "' + w.text.slice(0, 40) + '" har ett orimligt maxpris.');
+      return { id: uniqueId(w.id, seen), text: str(w.text, 300), person: str(w.person, 60), done: w.done === true,
+        img: safeUrl(w.img), dept: str(w.dept, 80), max: mx };
+    });
+    ['budget', 'limit'].forEach(function (k) {
+      if (o[k] === undefined) return;
+      var v = num(o[k]); if (!(v >= 0 && v < 10000000)) fail((k === 'budget' ? 'Budgeten' : 'Prisgränsen') + ' är inte ett giltigt belopp.');
+      s[k] = v;
+    });
+    if (o.departments !== undefined) {
+      if (!Array.isArray(o.departments) || o.departments.length > 300) fail('Avdelningarna i backupen är trasiga.');
+      var ds = o.deptFormat === 'diff' ? expandDepts(o.departments) : o.departments;
+      seen = {};
+      s.departments = ds.map(function (d, i) {
+        if (!d || typeof d.id !== 'string' || !d.id || typeof d.name !== 'string' || !d.name.trim()) fail('Avdelning ' + (i + 1) + ' i backupen saknar namn.');
+        if (seen[d.id]) fail('Avdelningen "' + d.name.slice(0, 40) + '" finns två gånger i backupen.');
+        seen[d.id] = 1;
+        var c = JSON.parse(JSON.stringify(d));
+        c.name = str(d.name, 80); c.order = num(d.order) > 0 ? d.order : i + 1;
+        if (!Array.isArray(c.keywords)) c.keywords = [];
+        c.keywords = c.keywords.filter(function (k) { return typeof k === 'string'; }).slice(0, 500);
+        return c;
+      });
+    }
+    if (o.deptLearn !== undefined) {
+      if (!o.deptLearn || typeof o.deptLearn !== 'object' || Array.isArray(o.deptLearn)) fail('Det inlärda om avdelningar är trasigt.');
+      s.deptLearn = {};
+      Object.keys(o.deptLearn).slice(0, 5000).forEach(function (k) { if (typeof o.deptLearn[k] === 'string') s.deptLearn[k.slice(0, 200)] = o.deptLearn[k].slice(0, 80); });
+    }
+    if (o.visit && typeof o.visit === 'object') {
+      var g = o.visit.geo, lat = g && num(g.lat), lng = g && num(g.lng);
+      s.visit = { cartNo: str(o.visit.cartNo, 40), parking: str(o.visit.parking, 120),
+        geo: g && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat: lat, lng: lng, ts: num(g.ts) || 0, acc: num(g.acc) || 0 } : null };
+    }
+    if (o.view && typeof o.view === 'object') s.view = { items: o.view.items, wishes: o.view.wishes };
+    if (num(o.lastExport) > 0) s.lastExport = o.lastExport;
+    return { state: upgrade(s), exportedAt: str(o.exportedAt, 40), version: num(o.version) || (o.departments ? 3 : 2) };
+  }
+
+  /* Kod: gzip + base64 när webbläsaren kan, annars bara base64. Börjar med UK3z. eller UK3j. */
+  function bytesToB64(bytes) {
+    var bin = '', i; for (i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function b64ToBytes(b64) {
+    var bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/')), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function pipe(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function encodeCode(json) {
+    var bytes = new TextEncoder().encode(json);
+    if (window.CompressionStream) return pipe(bytes, new CompressionStream('gzip')).then(function (z) { return 'UK3z.' + bytesToB64(z); });
+    return Promise.resolve('UK3j.' + bytesToB64(bytes));
+  }
+  function decodeCode(text) {
+    var t = String(text || '').trim();
+    if (/^[{\[]/.test(t)) return Promise.resolve().then(function () { return JSON.parse(t); });
+    return Promise.resolve().then(function () {
+      var m = t.replace(/\s+/g, '').match(/^(?:UK\d([zj])\.)?([A-Za-z0-9+\/_=-]+)$/);
+      if (!m) throw new Error('code');
+      var bytes = b64ToBytes(m[2]), gz = bytes[0] === 0x1f && bytes[1] === 0x8b;
+      if (gz && !window.DecompressionStream) throw new Error('Den här webbläsaren kan inte packa upp koden. Använd en backupfil i stället.');
+      return (gz ? pipe(bytes, new DecompressionStream('gzip')) : Promise.resolve(bytes)).then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
+    });
+  }
+
+  function today() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  function bkMsg(t) { $('bkExportMsg').textContent = t || ''; }
+  function bkError(t) { $('bkError').textContent = t || ''; }
+  function openBackup() {
+    pendingImport = null; bkMsg(''); bkError(''); $('bkCodeOut').hidden = true; $('bkCodeIn').value = '';
+    $('bkMain').hidden = false; $('bkConfirm').hidden = true; $('backupDlg').showModal();
+  }
+  ['backupBtn', 'backupBtn2', 'backupTipBtn'].forEach(function (id) { $(id).onclick = openBackup; });
+  $('bkClose').onclick = function () { $('backupDlg').close(); };
+
+  $('bkExportFile').onclick = function () {
+    state.lastExport = Date.now(); save();
+    var name = 'ullared-backup-' + today() + '.json';
+    var url = URL.createObjectURL(new Blob([JSON.stringify(backupData(), null, 1)], { type: 'application/json' }));
+    var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 2000);
+    bkMsg('Filen ' + name + ' är skapad. På iPhone hamnar den i appen Filer, under Hämtade filer.'); render();
+  };
+  $('bkCopyCode').onclick = function () {
+    state.lastExport = Date.now(); save(); render();
+    var codeP = encodeCode(JSON.stringify(backupData())), out = $('bkCodeOut');
+    function shown(code, copied) {
+      out.value = code; out.hidden = false;
+      if (copied) bkMsg('Koden är kopierad (' + Math.ceil(code.length / 1024) + ' kB). Klistra in den i Anteckningar eller i ett meddelande till dig själv.');
+      else { bkMsg('Markera koden nedan och kopiera den.'); out.focus(); out.select(); }
+    }
+    // ClipboardItem med ett löfte behåller "användaren tryckte" i Safari medan koden packas.
+    var copyP;
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        copyP = navigator.clipboard.write([new ClipboardItem({ 'text/plain': codeP.then(function (c) { return new Blob([c], { type: 'text/plain' }); }) })]);
+      }
+    } catch (e) { copyP = null; }
+    if (!copyP) copyP = codeP.then(function (c) { return navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(c) : Promise.reject(); });
+    copyP.then(function () { return codeP.then(function (c) { shown(c, true); }); },
+      function () { return codeP.then(function (c) { shown(c, false); }); });
+  };
+
+  function showImport(raw) {
+    var r;
+    try { r = readBackup(raw); } catch (e) { bkError(e.message + ' Inget har ändrats.'); return; }
+    pendingImport = r.state;
+    var s = r.state, n = s.items.reduce(function (a, i) { return a + i.qty; }, 0), custom = s.departments.filter(function (d) { return d.custom; }).length;
+    var parts = [n + (n === 1 ? ' vara' : ' varor'), s.wishes.length + (s.wishes.length === 1 ? ' önskning' : ' önskningar')];
+    if (custom) parts.push(custom + (custom === 1 ? ' egen avdelning' : ' egna avdelningar'));
+    if (s.visit.cartNo) parts.push('kundvagn ' + s.visit.cartNo);
+    $('bkSummary').textContent = 'Backupen innehåller ' + parts.join(', ') + '.';
+    var when = r.exportedAt && !isNaN(Date.parse(r.exportedAt)) ? new Date(r.exportedAt).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    $('bkWhen').textContent = (when ? 'Gjord ' + when + '. ' : '') + (r.version < 3 ? 'Från en äldre version av appen.' : '');
+    bkError(''); $('bkMain').hidden = true; $('bkConfirm').hidden = false; $('bkMerge').focus();
+  }
+  $('bkPickFile').onclick = function () { $('bkFile').click(); };
+  $('bkFile').onchange = function (e) {
+    var f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { bkError('Filen är för stor för att vara en backup. Inget har ändrats.'); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      decodeCode(rd.result).then(showImport, function () { bkError('Filen går inte att läsa. Den verkar inte vara en backup från Ullared-kassan. Inget har ändrats.'); });
+    };
+    rd.onerror = function () { bkError('Kunde inte öppna filen. Inget har ändrats.'); };
+    rd.readAsText(f);
+  };
+  $('bkReadCode').onclick = function () {
+    var t = $('bkCodeIn').value.trim(); if (!t) { $('bkCodeIn').focus(); return; }
+    decodeCode(t).then(showImport, function (e) {
+      bkError(e && e.message && e.message !== 'code' && e.message.indexOf('webbläsaren') >= 0 ? e.message
+        : 'Koden går inte att läsa. Kontrollera att hela koden kom med när du kopierade. Inget har ändrats.');
+    });
+  };
+  $('bkBack').onclick = function () { pendingImport = null; $('bkConfirm').hidden = true; $('bkMain').hidden = false; };
+  $('bkReplace').onclick = function () {
+    if (!pendingImport) return;
+    snap('ersatte allt med en backup');
+    state = JSON.parse(JSON.stringify(pendingImport)); pendingImport = null;
+    $('visitCard').open = !(state.visit.cartNo || state.visit.parking || state.visit.geo);
+    save(); render(); $('backupDlg').close(); toast('Allt är ersatt med backupen', true);
+  };
+  $('bkMerge').onclick = function () {
+    if (!pendingImport) return;
+    var inc = JSON.parse(JSON.stringify(pendingImport)), added = { items: 0, wishes: 0, depts: 0 }, ids;
+    snap('slog ihop med en backup');
+    ['items', 'wishes'].forEach(function (k) {
+      ids = {}; state[k].forEach(function (x) { ids[x.id] = 1; });
+      inc[k].forEach(function (x) { if (!ids[x.id]) { state[k].push(x); added[k]++; } });
+    });
+    ids = {}; state.departments.forEach(function (d) { ids[d.id] = 1; });
+    inc.departments.forEach(function (d) { if (!ids[d.id]) { d.order = state.departments.length + 1; state.departments.push(d); added.depts++; } });
+    renumber(sortedDepts());
+    Object.keys(inc.deptLearn).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(state.deptLearn, k)) state.deptLearn[k] = inc.deptLearn[k]; });
+    if (!state.visit.cartNo) state.visit.cartNo = inc.visit.cartNo;
+    if (!state.visit.parking) state.visit.parking = inc.visit.parking;
+    if (!state.visit.geo) state.visit.geo = inc.visit.geo;
+    if (!state.budget && inc.budget) state.budget = inc.budget;
+    pendingImport = null; save(); render(); $('backupDlg').close();
+    toast('La till ' + added.items + (added.items === 1 ? ' vara' : ' varor') + ' och ' + added.wishes + (added.wishes === 1 ? ' önskning' : ' önskningar'), true);
   };
 
   render();
