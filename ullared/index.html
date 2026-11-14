@@ -227,7 +227,6 @@
   #backupDlg textarea { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:16px; word-break:break-all; }
   /* Maxpris på önskningar */
   .wmeta .maxp { font-size:12px; color:var(--tag); font-weight:600; }
-  .pricehint.over { color:var(--red); }
   .addrow .btn { min-height:44px; padding:0 16px; }
 </style>
 </head>
@@ -1113,13 +1112,6 @@
   }
   function updateHint() {
     var h = $('priceHint'), p = parsePrice($('price').value);
-    // Köper från listan med maxpris: jämför mot det först
-    var lw = typeof linked !== 'undefined' && linked ? findWish(linked) : null;
-    if (p > 0 && lw && lw.max > 0) {
-      if (p > lw.max) { h.textContent = 'Över maxpris ' + fmt(lw.max) + ' (' + fmt(p - lw.max) + ' för mycket)'; h.className = 'pricehint over'; }
-      else { h.textContent = '✓ Inom maxpris ' + fmt(lw.max); h.className = 'pricehint low'; }
-      return;
-    }
     if (!(p > 0) || !(state.limit > 0)) { h.textContent = ''; h.className = 'pricehint'; return; }
     if (p < state.limit) { h.textContent = '✓ Under ' + fmt(state.limit); h.className = 'pricehint low'; }
     else { h.textContent = fmt(state.limit) + ' eller mer'; h.className = 'pricehint'; }
@@ -1367,8 +1359,7 @@
     linked = id;
     var w = id && findWish(id);
     $('linkBanner').hidden = !w;
-    if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '') + (w.max ? ' · max ' + fmt(w.max) : '');
-    updateHint();
+    if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '');
   }
   $('linkCancel').onclick = function () { setLink(null); };
 
