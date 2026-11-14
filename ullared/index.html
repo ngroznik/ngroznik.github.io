@@ -92,14 +92,14 @@
   .listhead { display:flex; justify-content:space-between; align-items:center; margin:22px 0 4px; }
   h2 { font-size:16px; font-weight:700; margin:0; }
   ul { list-style:none; margin:0; padding:0; }
-  li.item { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; padding:12px 14px; margin-top:8px;
+  li.item { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; padding:10px 12px; margin-top:8px;
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
   .item .name { position:relative; font-weight:600; font-size:15px; background:none; border:0; text-align:left; padding:0; min-height:24px; }
   .item .calc { color:var(--muted); font-size:13px; }
   .item .line { font-weight:700; font-size:16px; font-variant-numeric:tabular-nums; text-align:right; }
-  .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:8px; }
-  .item .acts button { min-width:44px; height:44px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface-2); font-weight:700; font-size:15px; }
-  .item .acts .n { white-space:nowrap; min-width:32px; text-align:center; }
+  .item .acts { grid-column:1/-1; display:flex; align-items:center; gap:14px; }
+  .item .acts button { min-width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2); font-weight:600; font-size:15px; line-height:1; padding:0; }
+  .item .acts .n { white-space:nowrap; min-width:28px; text-align:center; font-size:13px; margin:0 -6px; }
   .empty { color:var(--muted); padding:14px 0; }
   .tools { display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:12px; }
   .linkbtn { min-width:44px; background:none; border:0; color:var(--red); text-decoration:underline; text-underline-offset:3px; padding:10px 0; font-size:14px; min-height:44px; }
@@ -141,35 +141,40 @@
   /* Önskelistan */
   .wishadd { display:grid; gap:12px; }
   .wishgroup { margin-top:20px; }
-  .wish { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:10px 12px; margin-top:8px;
+  .wish { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; padding:8px 12px; margin-top:8px;
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
-  .wish .check { width:44px; height:44px; border-radius:50%; border:2px solid var(--accent); background:none; font-size:16px; font-weight:700; line-height:1; color:var(--accent-ink); }
+  .wish .check { width:28px; height:28px; padding:0; border-radius:50%; border:2px solid var(--accent); background:none; font-size:13px; font-weight:700; line-height:1; color:var(--accent-ink); }
   .wish .check[aria-checked=true] { background:var(--green); border-color:var(--green); color:#0f2a1c; }
   .wish .txt { position:relative; min-width:44px; font-size:15px; font-weight:500; background:none; border:0; text-align:left; padding:2px 0; }
   .item .name::after, .wish .txt::after { content:""; position:absolute; left:0; right:0; top:50%; height:44px; transform:translateY(-50%); }
   .wish.done { opacity:.7; }
   .wish.done .txt { text-decoration:line-through; color:var(--muted); font-weight:500; }
-  .wish .buy { min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--tag); background:none; color:var(--tag); font-weight:700; }
+  .wish .buy { min-height:30px; padding:0 12px; border-radius:999px; border:1px solid var(--tag); background:none; color:var(--tag); font-weight:600; font-size:13px; }
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
-  .filters button { min-height:44px; padding:0 16px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-weight:600; }
+  .filters button { min-height:32px; padding:0 14px; font-size:13px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--muted); font-weight:600; }
   .filters button[aria-pressed=true] { background:var(--surface-2); color:var(--ink); border-color:var(--accent); }
   textarea { width:100%; font:inherit; font-size:16px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-s); background:rgba(10,7,30,.35); color:var(--ink); min-height:150px; }
   .check-row { display:flex; align-items:center; gap:10px; min-height:44px; margin-top:8px; font-size:14px; color:var(--ink); }
-  .check-row input { width:24px; height:24px; accent-color:var(--accent); }
+  .check-row input { width:18px; height:18px; margin:0; accent-color:var(--accent); }
   .sr { position:absolute; left:-9999px; }
 
   /* Avdelningar */
-  /* Avdelningsknapp: 44 px tryckyta, synlig pill inuti */
-  .deptchip { min-height:44px; max-width:100%; padding:0; border:0; background:none; display:inline-flex; align-items:center; min-width:0; text-align:left; }
-  .deptchip > span { display:block; max-width:100%; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2);
-    font-weight:600; font-size:12px; line-height:1.2; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Små knappar med osynlig tryckyta på minst 44 x 44 px */
+  .wish .check, .wish .buy, .item .acts button, .seg button, .filters button, .deptchip { position:relative; }
+  .wish .check::before, .wish .buy::before, .item .acts button::before, .seg button::before, .filters button::before, .deptchip::before {
+    content:""; position:absolute; left:50%; top:50%; width:max(100%, 44px); height:max(100%, 44px); transform:translate(-50%, -50%); }
+  .filters { gap:12px 8px; }
+  /* Avdelningsknapp: synlig pill inuti */
+  .deptchip { min-height:24px; max-width:100%; padding:0; border:0; background:none; display:inline-flex; align-items:center; min-width:0; text-align:left; }
+  .deptchip > span { display:block; max-width:100%; padding:3px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2);
+    font-weight:600; font-size:11px; line-height:1.2; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .deptchip.none > span { border-style:dashed; background:none; color:var(--muted); font-weight:500; }
-  .item .acts .deptchip { flex:0 1 auto; min-width:0; border:0; background:none; padding:0; font-size:12px; }
+  .item .acts .deptchip { flex:0 1 auto; min-width:0; height:auto; min-height:24px; border:0; background:none; padding:0; font-size:11px; }
   .wcol { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; }
   .wmeta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
   .wmeta .who { font-size:12px; color:var(--muted); }
-  .seg { display:inline-flex; gap:4px; padding:4px; border:1px solid var(--line); border-radius:999px; background:var(--surface); margin-top:10px; }
-  .seg button { min-height:44px; padding:0 14px; border:0; border-radius:999px; background:none; color:var(--muted); font-weight:600; font-size:14px; }
+  .seg { display:inline-flex; gap:4px; padding:3px; border:1px solid var(--line); border-radius:999px; background:var(--surface); margin-top:10px; }
+  .seg button { min-height:32px; padding:0 14px; border:0; border-radius:999px; background:none; color:var(--muted); font-weight:600; font-size:14px; }
   .seg button[aria-pressed=true] { background:var(--accent); color:var(--accent-ink); }
   .grouphead { margin-top:22px; padding:0 4px; }
   .wishgroup .grouphead { margin-top:0; }
