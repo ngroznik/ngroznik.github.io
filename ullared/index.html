@@ -215,6 +215,9 @@
   a.linkbtn-btn[aria-disabled=true] { background:var(--surface-2); border-color:var(--line); color:var(--muted); opacity:.6; cursor:not-allowed; }
   #cartHead { margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--surface-2); color:var(--tag); font-weight:600; font-size:12px; }
   .camera { margin-top:12px; }
+  /* Maxpris på önskningar */
+  .wmeta .maxp { font-size:12px; color:var(--tag); font-weight:600; }
+  .pricehint.over { color:var(--red); }
   .addrow .btn { min-height:44px; padding:0 16px; }
 </style>
 </head>
@@ -326,6 +329,10 @@
     <div>
       <label for="wPerson">Till vem? (valfritt)</label>
       <input type="text" id="wPerson" list="peopleList" placeholder="t.ex. Emma" autocomplete="off">
+    </div>
+    <div>
+      <label for="wMax">Max pris, kr (valfritt)</label>
+      <input type="text" id="wMax" inputmode="decimal" placeholder="t.ex. 300" autocomplete="off">
       <datalist id="peopleList"></datalist>
     </div>
     <div>
@@ -396,6 +403,8 @@
     <input type="text" id="wEditText" autocomplete="off">
     <label for="wEditPerson" style="margin-top:10px">Till vem</label>
     <input type="text" id="wEditPerson" list="peopleList" autocomplete="off">
+    <label for="wEditMax" style="margin-top:10px">Max pris, kr (lämna tomt för inget)</label>
+    <input type="text" id="wEditMax" inputmode="decimal" autocomplete="off">
     <label for="wEditImg" style="margin-top:10px">Bild- eller produktlänk</label>
     <input type="text" id="wEditImg" inputmode="url" autocomplete="off" style="font-size:16px">
     <label for="wEditDept" style="margin-top:10px">Avdelning</label>
@@ -410,8 +419,8 @@
 
 <dialog id="bulkDlg">
   <form method="dialog" id="bulkForm">
-    <label for="bText">Klistra in en sak per rad. Skriv en rad som "Emma:" för att byta person.</label>
-    <textarea id="bText" placeholder="Emma:&#10;Vinterskor&#10;Mössa&#10;Liam:&#10;Fotbollsstrumpor"></textarea>
+    <label for="bText">Klistra in en sak per rad. Skriv en rad som "Emma:" för att byta person, och "max 300" efter en sak för maxpris.</label>
+    <textarea id="bText" placeholder="Emma:&#10;Vinterskor max 300&#10;Mössa&#10;Liam:&#10;Fotbollsstrumpor"></textarea>
     <label for="bPerson" style="margin-top:10px">Person för rader utan rubrik (valfritt)</label>
     <input type="text" id="bPerson" list="peopleList" autocomplete="off">
     <div class="row">
@@ -523,7 +532,10 @@
     if (s.view.wishes !== 'person' && s.view.wishes !== 'dept') s.view.wishes = 'dept';
     if (s.view.items !== 'recent' && s.view.items !== 'dept') s.view.items = 'recent';
     s.items.forEach(function (i) { if (typeof i.dept !== 'string') i.dept = ''; });
-    s.wishes.forEach(function (w) { if (typeof w.dept !== 'string') w.dept = ''; });
+    s.wishes.forEach(function (w) {
+      if (typeof w.dept !== 'string') w.dept = '';
+      if (!(typeof w.max === 'number' && w.max > 0)) w.max = 0;
+    });
     var v = s.visit && typeof s.visit === 'object' ? s.visit : {};
     s.visit = { cartNo: typeof v.cartNo === 'string' ? v.cartNo : '', parking: typeof v.parking === 'string' ? v.parking : '',
       geo: v.geo && isFinite(v.geo.lat) && isFinite(v.geo.lng) ? { lat: +v.geo.lat, lng: +v.geo.lng, ts: +v.geo.ts || 0, acc: +v.geo.acc || 0 } : null };
@@ -874,6 +886,13 @@
   }
   function updateHint() {
     var h = $('priceHint'), p = parsePrice($('price').value);
+    // Köper från listan med maxpris: jämför mot det först
+    var lw = typeof linked !== 'undefined' && linked ? findWish(linked) : null;
+    if (p > 0 && lw && lw.max > 0) {
+      if (p > lw.max) { h.textContent = 'Över maxpris ' + fmt(lw.max) + ' (' + fmt(p - lw.max) + ' för mycket)'; h.className = 'pricehint over'; }
+      else { h.textContent = '✓ Inom maxpris ' + fmt(lw.max); h.className = 'pricehint low'; }
+      return;
+    }
     if (!(p > 0) || !(state.limit > 0)) { h.textContent = ''; h.className = 'pricehint'; return; }
     if (p < state.limit) { h.textContent = '✓ Under ' + fmt(state.limit); h.className = 'pricehint low'; }
     else { h.textContent = fmt(state.limit) + ' eller mer'; h.className = 'pricehint'; }
@@ -1121,7 +1140,8 @@
     linked = id;
     var w = id && findWish(id);
     $('linkBanner').hidden = !w;
-    if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '');
+    if (w) $('linkTxt').textContent = 'Köper: ' + w.text + (w.person ? ' (' + w.person + ')' : '') + (w.max ? ' · max ' + fmt(w.max) : '');
+    updateHint();
   }
   $('linkCancel').onclick = function () { setLink(null); };
 
@@ -1183,6 +1203,7 @@
         var col = document.createElement('div'); col.className = 'wcol'; col.appendChild(txt);
         var meta = document.createElement('div'); meta.className = 'wmeta';
         meta.appendChild(deptChip(w, w.text));
+        if (w.max) { var mx = document.createElement('span'); mx.className = 'maxp'; mx.textContent = 'max ' + fmt(w.max); meta.appendChild(mx); }
         if (byDept && w.person) { var who = document.createElement('span'); who.className = 'who'; who.textContent = w.person; meta.appendChild(who); }
         col.appendChild(meta); wrap.appendChild(col);
         row.appendChild(chk); row.appendChild(wrap);
@@ -1205,14 +1226,20 @@
   }
   $('hideDone').onchange = renderWishes;
 
+  // Maxpris: tomt = 0 (inget), ogiltigt = -1
+  function parseMax(s) {
+    s = String(s || '').replace(/kr/i, '').trim(); if (!s) return 0;
+    var n = parsePrice(s); return n > 0 && n < 100000 ? Math.round(n * 100) / 100 : -1;
+  }
   function addWish() {
     var t = $('wText').value.trim(); if (!t) { $('wText').focus(); return; }
-    var person = $('wPerson').value.trim(), wimg = safeUrl($('wImg').value);
+    var person = $('wPerson').value.trim(), wimg = safeUrl($('wImg').value), max = parseMax($('wMax').value);
+    if (max < 0) { toast('Maxpriset ska vara ett belopp, t.ex. 300', false); $('wMax').focus(); return; }
     snap('la till i listan: ' + t);
     var dept = guessDept(t), dd = deptById(dept);
-    state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg, dept: dept });
+    state.wishes.push({ id: uid(), text: t, person: person, done: false, img: wimg, dept: dept, max: max });
     save(); render(); toast('Tillagd: ' + t + ' · ' + (dd ? dd.name : 'Övrigt'), true);
-    $('wText').value = ''; $('wImg').value = ''; $('wText').focus();
+    $('wText').value = ''; $('wImg').value = ''; $('wMax').value = ''; $('wText').focus();
   }
   $('wAdd').onclick = addWish;
   $('wText').addEventListener('keydown', function (e) { if (e.key === 'Enter') addWish(); });
@@ -1222,12 +1249,16 @@
   function openWish(id) {
     var w = findWish(id); if (!w) return; editWish = id;
     $('wEditText').value = w.text; $('wEditPerson').value = w.person; $('wEditImg').value = w.img || '';
+    $('wEditMax').value = w.max ? String(w.max).replace('.', ',') : '';
     fillDeptSelect($('wEditDept'), w.dept); $('wishDlg').showModal();
   }
   $('wEditCancel').onclick = function () { $('wishDlg').close(); };
-  $('wishForm').onsubmit = function () {
+  $('wEditMax').addEventListener('input', function () { this.setCustomValidity(''); });
+  $('wishForm').onsubmit = function (e) {
     var w = findWish(editWish), t = $('wEditText').value.trim(); if (!w || !t) return;
-    snap('ändrade ' + w.text); w.text = t; w.person = $('wEditPerson').value.trim(); w.img = safeUrl($('wEditImg').value);
+    var max = parseMax($('wEditMax').value);
+    if (max < 0) { e.preventDefault(); $('wEditMax').setCustomValidity('Skriv ett belopp, t.ex. 300'); $('wEditMax').reportValidity(); return; }
+    snap('ändrade ' + w.text); w.text = t; w.person = $('wEditPerson').value.trim(); w.img = safeUrl($('wEditImg').value); w.max = max;
     var nd = $('wEditDept').value;
     if (nd !== (w.dept || '')) { w.dept = nd; learnDept(w.text, nd); }
     save(); render(); toast('Sparade ändringen', true);
@@ -1252,7 +1283,10 @@
       line = line.replace(/^[-*•·\u2022]+\s*/, '').replace(/^\d+[.)]\s+/, '').trim();
       var um = line.match(/\s*(\S+\.\S+)\s*$/), url = '';
       if (um && safeUrl(um[1]) && /^(https?:\/\/|www\.)/i.test(um[1])) { url = safeUrl(um[1]); line = line.slice(0, um.index).trim(); }
-      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: guessDept(line) }); n++; }
+      // "Vinterskor max 300" eller "Vinterskor (max 300 kr)" ger maxpris 300
+      var mm = line.match(/[\s,(]*\bmax\.?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:kr|:-)?\)?\s*$/i), max = 0;
+      if (mm) { max = Math.max(0, parseMax(mm[1])); line = line.slice(0, mm.index).trim(); }
+      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: guessDept(line), max: max }); n++; }
     });
     if (!n) return;
     snap('la till ' + n + ' i listan');
@@ -1262,7 +1296,7 @@
   /* Dela / ta bort klara */
   $('wShare').onclick = function () {
     var lines = [], ppl = people().concat(['']), line = function (w, who) {
-      return (w.done ? '[x] ' : '[ ] ') + w.text + (who && w.person ? ' (' + w.person + ')' : '') + (w.img ? ' ' + w.img : '');
+      return (w.done ? '[x] ' : '[ ] ') + w.text + (w.max ? ' max ' + fmt(w.max) : '') + (who && w.person ? ' (' + w.person + ')' : '') + (w.img ? ' ' + w.img : '');
     };
     if (state.view.wishes === 'dept') {
       groupByDept(state.wishes).forEach(function (g) {
