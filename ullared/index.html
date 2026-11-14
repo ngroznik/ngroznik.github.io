@@ -198,26 +198,28 @@
   .depts-scroll { max-height:55vh; overflow:auto; margin:10px 0; }
   .addrow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
   /* Kundvagn & parkering */
-  .visit { padding:0 14px; margin-top:0; }
-  .visit summary { display:flex; align-items:center; gap:8px; min-height:48px; cursor:pointer; list-style:none; font-weight:600; font-size:15px; }
-  .visit summary::-webkit-details-marker { display:none; }
-  .visit summary::after { content:""; width:8px; height:8px; margin-left:auto; flex:none; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  .fold { padding:0 14px; }
+  .fold[open] { padding-bottom:14px; }
+  .visit { margin-top:0; }
+  .fold summary { display:flex; align-items:center; gap:8px; min-height:48px; cursor:pointer; list-style:none; font-weight:600; font-size:15px; }
+  .fold summary::-webkit-details-marker { display:none; }
+  .fold summary::after { content:""; width:8px; height:8px; margin-left:auto; flex:none; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
     transform:rotate(45deg) translateY(-2px); transition:transform .15s; }
-  .visit[open] summary::after { transform:rotate(-135deg) translateY(-2px); }
-  .visit .vtitle { white-space:nowrap; flex:none; }
-  .visit .vsum { font-size:13px; font-weight:500; color:var(--tag); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-  .visit[open] .vsum { display:none; }
+  .fold[open] summary::after { transform:rotate(-135deg) translateY(-2px); }
+  .fold .vtitle { white-space:nowrap; flex:none; }
+  .fold .vsum { font-size:13px; font-weight:500; color:var(--tag); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .fold[open] .vsum { display:none; }
   .visit .vfields { display:grid; grid-template-columns:1fr 1.6fr; gap:10px; }
   .visit .row { margin-top:12px; }
   .visit .vgeo { font-size:13px; color:var(--muted); margin:8px 0 0; min-height:18px; }
   .visit .vgeo.warn { color:var(--red); }
   .visit .linkbtn { padding:0; }
-  .visit { padding-bottom:4px; }
-  .visit:not([open]) { padding-bottom:0; }
   a.linkbtn-btn { display:flex; align-items:center; justify-content:center; text-decoration:none; background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
   a.linkbtn-btn[aria-disabled=true] { background:var(--surface-2); border-color:var(--line); color:var(--muted); opacity:.6; cursor:not-allowed; }
   #cartHead { margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--surface-2); color:var(--tag); font-weight:600; font-size:12px; }
-  .camera { margin-top:12px; }
+  .fold .camera { margin-top:2px; }
+  .addfields { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .fold .wishadd { margin-top:2px; }
   /* Backup */
   .tip { display:flex; align-items:center; gap:10px; margin-top:16px; padding:10px 10px 10px 14px; border-radius:var(--radius);
     background:rgba(255,209,102,.1); border:1px solid rgba(255,209,102,.35); font-size:13px; }
@@ -249,7 +251,7 @@
 
 <main>
 <section id="paneScan">
-  <details class="card visit" id="visitCard">
+  <details class="card fold visit" id="visitCard">
     <summary><span class="vtitle">Kundvagn &amp; parkering</span><span class="vsum" id="visitSum"></span></summary>
     <div class="vfields">
       <div>
@@ -270,6 +272,8 @@
     <button type="button" class="linkbtn" id="visitClear">Rensa</button>
   </details>
 
+  <details class="card fold" id="addCard" open>
+  <summary><span class="vtitle">Lägg till vara</span></summary>
   <div class="camera">
     <video id="video" playsinline muted autoplay></video>
     <div class="frame" aria-hidden="true"></div>
@@ -286,7 +290,7 @@
   </div>
   <div class="status" id="status" role="status"></div>
 
-  <div class="card">
+  <div class="addfields">
     <div class="linkbanner" id="linkBanner" hidden><span id="linkTxt"></span><button type="button" id="linkCancel">Avbryt</button></div>
     <div class="chips" id="chips" aria-label="Förslag på pris"></div>
     <label for="name">Vad är det? (valfritt)</label>
@@ -310,6 +314,7 @@
     <div class="pricehint" id="priceHint" aria-live="polite"></div>
     <div class="row"><button class="btn red" id="addBtn">Lägg i korgen</button></div>
   </div>
+  </details>
 
   <div class="tip" id="backupTip" hidden>
     <span>Tips: ta en backup av korgen ifall telefonen strular.</span>
@@ -337,7 +342,9 @@
 </section>
 
 <section id="paneList" hidden>
-  <div class="card wishadd">
+  <details class="card fold" id="wishAddCard">
+  <summary><span class="vtitle">Lägg till på listan</span></summary>
+  <div class="wishadd">
     <div>
       <label for="wText">Något som ska köpas</label>
       <input type="text" id="wText" placeholder="t.ex. Vinterskor stl 34" autocomplete="off" enterkeyhint="done">
@@ -360,6 +367,7 @@
       <button class="btn" id="wBulk">Klistra in flera</button>
     </div>
   </div>
+  </details>
 
   <div class="listhead"><h2>Att köpa</h2><span id="wishCount" style="color:var(--muted);font-size:13px"></span></div>
   <div class="seg" role="group" aria-label="Visa listan" id="wishView">
@@ -687,7 +695,19 @@
     state.visit = { cartNo: '', parking: '', geo: null }; geoMsg('');
     save(); render(); toast('Kundvagn och parkering rensade', true);
   };
-  $('visitCard').open = !(state.visit.cartNo || state.visit.parking || state.visit.geo);
+  /* ---------- Utfällbara kort ----------
+     Kommer ihåg öppet/stängt per telefon. Sparas för sig, inte i korgen eller backupen. */
+  var UI_KEY = 'ullared-kassa-ui', ui = {};
+  try { ui = JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch (e) { ui = {}; }
+  function foldInit(id, byDefault) {
+    var el = $(id);
+    el.open = typeof ui[id] === 'boolean' ? ui[id] : byDefault;
+    el.addEventListener('toggle', function () { ui[id] = el.open; try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {} });
+  }
+  foldInit('visitCard', false);                     // Kundvagn & parkering: stängd
+  foldInit('addCard', true);                        // Lägg till vara: öppen
+  foldInit('wishAddCard', !state.wishes.length);    // Lägg till på listan: öppen bara när listan är tom
+  $('addCard').addEventListener('toggle', function () { if (!this.open && stream) stopCamera(); });   // fäller man ihop stängs kameran
 
   /* ---------- Render ---------- */
   function total() { return state.items.reduce(function (s, i) { return s + i.price * i.qty; }, 0); }
@@ -1416,7 +1436,7 @@
           var buy = document.createElement('button'); buy.className = 'buy'; buy.textContent = 'Köp';
           buy.setAttribute('aria-label', 'Skanna pris för ' + w.text);
           buy.onclick = function () {
-            setLink(w.id); $('name').value = w.text; $('img').value = w.img || ''; showTab('scan');
+            setLink(w.id); $('name').value = w.text; $('img').value = w.img || ''; $('addCard').open = true; showTab('scan');
             setStatus('Skanna priset för: ' + w.text);
           };
           row.appendChild(buy);
@@ -1721,7 +1741,6 @@
     if (!pendingImport) return;
     snap('ersatte allt med en backup');
     state = JSON.parse(JSON.stringify(pendingImport)); pendingImport = null;
-    $('visitCard').open = !(state.visit.cartNo || state.visit.parking || state.visit.geo);
     save(); render(); $('backupDlg').close(); toast('Allt är ersatt med backupen', true);
   };
   $('bkMerge').onclick = function () {
