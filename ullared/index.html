@@ -19,6 +19,7 @@
     --tag:#ffd166; --tag-ink:#21184f;          /* månljus: totalsumma, huvudknapp */
     --accent:#b9a5ff; --accent-ink:#1b1446;    /* lila: vanliga knappar, valt läge */
     --red:#ff9db0; --green:#8ff0b4;
+    --person:#ff69b4;                           /* hotpink: personer på listan */
     --radius:6px; --radius-s:6px; --pill:999px;
   }
   * { box-sizing:border-box; }
@@ -167,7 +168,7 @@
   .item .acts .deptchip { flex:0 1 auto; min-width:0; height:auto; min-height:24px; border:0; background:none; padding:0; font-size:11px; }
   .wcol { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; }
   .wmeta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
-  .wmeta .who { font-size:12px; color:var(--muted); }
+  .wmeta .who { font-size:12px; font-weight:600; color:var(--person); }
   .seg { display:inline-flex; gap:4px; padding:3px; border:1px solid var(--line); border-radius:999px; background:var(--surface); margin-top:10px; }
   .seg button { min-height:32px; padding:0 14px; border:0; border-radius:999px; background:none; color:var(--muted); font-weight:600; font-size:14px; }
   .seg button[aria-pressed=true] { background:var(--accent); color:var(--accent-ink); }
