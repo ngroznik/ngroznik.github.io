@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1446">
+<meta name="description" content="Så använder du Ullared-kassan: inköpslista, rutt, skanna priser, korgen, kartan, vagn och backup.">
+<title>Guide till Ullared-kassan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+  /* Samma nattlila känsla som appen: en kolumn att läsa i telefonen, gula etiketter som appens prislappar. */
+  :root {
+    color-scheme: dark;
+    --bg: #1b1446;
+    --surface: #2a2163;
+    --surface-2: #33297a;
+    --line: rgba(185, 165, 255, .22);
+    --ink: #f3efff;
+    --muted: #c3b9ec;
+    --accent: #b9a5ff;
+    --tag: #ffd166;
+    --tag-ink: #1b1446;
+    --pink: #ff69b4;
+    --font: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.6; margin: 0; }
+  .wrap { max-width: 680px; margin: 0 auto; padding-block: 28px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { display: grid; gap: 10px; margin-bottom: 26px; }
+  .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: clamp(28px, 7vw, 38px); line-height: 1.15; margin: 0; text-wrap: balance; }
+  h1 .kr { color: var(--tag); }
+  .lead { color: var(--muted); margin: 0; max-width: 60ch; }
+  .link { display: inline-flex; align-items: center; gap: 8px; align-self: start; background: var(--tag); color: var(--tag-ink);
+    font-weight: 700; text-decoration: none; border-radius: 999px; padding: 10px 18px; min-height: 44px; }
+  .link:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 30px; }
+  nav a { color: var(--ink); text-decoration: none; font-size: 14px; border: 1px solid var(--line); background: var(--surface);
+    border-radius: 999px; padding: 8px 14px; min-height: 40px; display: inline-flex; align-items: center; }
+  section { margin-top: 38px; scroll-margin-top: 16px; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 0 0 6px; text-wrap: balance; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p { margin: 8px 0; max-width: 65ch; }
+  ol, ul { padding-left: 22px; margin: 8px 0; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--accent); font-weight: 600; }
+  .ui { display: inline-block; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 9px;
+    font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .tag { display: inline-block; background: var(--tag); color: var(--tag-ink); border-radius: 6px; padding: 0 7px; font-weight: 700; font-size: 14px; }
+  .who { color: var(--pink); font-weight: 600; }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin: 14px 0; }
+  .box p:first-child { margin-top: 0; } .box p:last-child { margin-bottom: 0; }
+  .box.tip { border-left: 4px solid var(--tag); }
+  .box.warn { border-left: 4px solid #ff9db0; }
+  .box b.h { display: block; margin-bottom: 2px; }
+  pre { background: rgba(10, 7, 30, .45); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; line-height: 1.5; margin: 10px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 12px 0; }
+  .grid .box { margin: 0; }
+  .map { display: grid; grid-template-columns: 26px repeat(6, 1fr); gap: 3px; max-width: 360px; margin: 12px 0; font-size: 11px; }
+  .map span { min-width: 0; text-align: center; padding: 3px 0; border-radius: 3px; background: var(--surface-2); color: var(--muted); }
+  .map span.ax { background: none; }
+  .map span.on { background: var(--tag); color: var(--tag-ink); font-weight: 700; }
+  footer { margin-top: 44px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">För familjen · Gekås Ullared</div>
+    <h1>Ullared-kassan: <span class="kr">så använder du den</span></h1>
+    <p class="lead">En liten app i telefonens webbläsare. Den räknar ihop vad du har i vagnen, håller koll på inköpslistan och visar var avdelningarna ligger i varuhuset.</p>
+    <a class="link" href="./">Öppna appen →</a>
+  </header>
+
+  <nav aria-label="Innehåll">
+    <a href="#start">Kom igång</a>
+    <a href="#lista">Inköpslistan</a>
+    <a href="#rutt">Rutten</a>
+    <a href="#vara">Lägg i korgen</a>
+    <a href="#korgen">Korgen</a>
+    <a href="#karta">Kartan</a>
+    <a href="#vagn">Vagn &amp; bil</a>
+    <a href="#backup">Backup</a>
+    <a href="#fragor">Frågor</a>
+  </nav>
+
+  <div class="box tip">
+    <b class="h">Bra att veta först</b>
+    <p>Allt du skriver sparas bara i din egen telefon. Det finns inget konto och ingen inloggning, och ingen annan kan se din korg eller lista. Varje person i familjen har alltså sin egen korg och lista i sin egen telefon.</p>
+  </div>
+
+  <section id="start">
+    <h2>1. Kom igång</h2>
+    <ol>
+      <li>Öppna <b>ngroznik.github.io/ullared</b> i Safari (iPhone) eller Chrome (Android).</li>
+      <li>Lägg appen på hemskärmen så hittar du den snabbt:
+        <ul>
+          <li><b>iPhone:</b> tryck på dela-knappen (fyrkanten med pil uppåt) och välj <span class="ui">Lägg till på hemskärmen</span>.</li>
+          <li><b>Android:</b> tryck på de tre prickarna ⋮ och välj <span class="ui">Lägg till på startskärmen</span>.</li>
+        </ul>
+      </li>
+      <li>Appen har två flikar högst upp: <span class="ui">Skanna</span> (det du lägger i vagnen) och <span class="ui">Att köpa</span> (inköpslistan).</li>
+    </ol>
+    <div class="box warn">
+      <p>Öppna alltid appen på samma sätt, till exempel från hemskärmen. Datan sparas i den webbläsare du använder. Rensar du webbläsarens historik och webbplatsdata försvinner korgen och listan, så ta en <a href="#backup" style="color:var(--accent)">backup</a> innan.</p>
+    </div>
+  </section>
+
+  <section id="lista">
+    <h2>2. Gör inköpslistan hemma</h2>
+    <p>Gå till fliken <span class="ui">Att köpa</span> och öppna <span class="ui">Lägg till på listan</span>.</p>
+    <ol>
+      <li><b>Något som ska köpas:</b> skriv vad det är, till exempel ”Vinterskor stl 34”.</li>
+      <li><b>Avdelning:</b> tryck på <span class="ui">Välj avdelning</span>. Avdelningarna står per våningsplan, och under varje namn står vad som finns där (under Kroppsvård står till exempel Hårvård, Munvård, Hygienartiklar). Tryck på den som passar. Du kan hoppa över det, men då hamnar saken under Övrigt och syns inte på kartan.</li>
+      <li><b>Till vem:</b> skriv ett namn, till exempel Emma. Namnet syns i <span class="who">rosa</span> på listan.</li>
+      <li><b>Max pris:</b> om du inte vill betala mer än ett visst belopp.</li>
+      <li><b>Bild- eller produktlänk:</b> klistra in en länk om du har sett varan på nätet.</li>
+      <li>Tryck <span class="ui">Lägg till i listan</span>.</li>
+    </ol>
+
+    <h3>Lägga in många saker på en gång</h3>
+    <p>Tryck <span class="ui">Klistra in flera</span> och skriv en sak per rad. En rad som slutar med kolon byter person, och ”max” efter en sak blir maxpris. Under textrutan kan du välja en avdelning för alla raderna. Här klistrar du också in en lista som någon har skickat till dig.</p>
+<pre>Emma:
+Vinterskor max 300
+Mössa
+Liam:
+Fotbollsstrumpor</pre>
+
+    <h3>Visa listan på olika sätt</h3>
+    <ul>
+      <li><span class="ui">Per person</span> visar vad varje person ska ha.</li>
+      <li><span class="ui">Per avdelning</span> visar listan i den ordning du går genom varuhuset (se <a href="#rutt" style="color:var(--accent)">Rutten</a>).</li>
+      <li>Tryck på ett namn under knapparna för att bara se den personens saker.</li>
+      <li>Kryssa i <span class="ui">Dölj de som är klara</span> för att bara se det som är kvar.</li>
+      <li>Vill du ändra eller ta bort något? Tryck på texten.</li>
+    </ul>
+  </section>
+
+  <section id="rutt">
+    <h2>3. Rutten genom varuhuset</h2>
+    <p>När sakerna på listan har en avdelning räknar appen ut en kort väg från ingången till kassorna.</p>
+    <ul>
+      <li>Tryck <span class="ui">Visa rutten på kartan</span> på fliken Att köpa. Avdelningarna lyser gula med en siffra, och en streckad linje visar vägen.</li>
+      <li>Under kartan står stoppen i ordning, med vad du ska köpa på varje ställe. Tryck på ett stopp för att se just den avdelningen.</li>
+      <li>I <span class="ui">Per avdelning</span> står samma siffror framför varje avdelning, så du kan gå uppifrån och ner i listan.</li>
+      <li>Har du valt en person visas bara den personens rutt.</li>
+      <li>När allt på en avdelning är avbockat flyttas den sist i listan och resten numreras om.</li>
+    </ul>
+  </section>
+
+  <section id="vara">
+    <h2>4. I butiken: lägg en vara i korgen</h2>
+    <p>Gå till fliken <span class="ui">Skanna</span> och öppna <span class="ui">Lägg till vara</span>.</p>
+    <ol>
+      <li>Tryck <span class="ui">Starta kamera</span> och tillåt kameran.</li>
+      <li>Håll prislappen inne i den <span class="tag">gula ramen</span>. Få gärna med varans namn också.</li>
+      <li>Tryck <span class="ui">Läs pris</span> och håll telefonen stilla en sekund. Priset fylls i, och efter ett par sekunder även namnet från lappen.</li>
+      <li><b>Kolla alltid att priset stämmer.</b> Hittar appen flera tal visas de som knappar, och då trycker du på rätt pris. Du kan också skriva priset själv.</li>
+      <li>Välj <span class="ui">Avdelning</span> om du vill. Valet ligger kvar till nästa vara, så du slipper välja igen när du handlar flera saker på samma avdelning.</li>
+      <li>Ändra <span class="ui">Antal</span> med − och + om du tar fler än en.</li>
+      <li>Tryck <span class="ui">Lägg i korgen</span>.</li>
+    </ol>
+    <div class="grid">
+      <div class="box"><b class="h">Mörkt eller blankt?</b><p>Tryck <span class="ui">Ficklampa</span> på kamerabilden, eller använd <span class="ui">Ta bild istället</span>. Då tar du ett vanligt foto och appen läser hela bilden.</p></div>
+      <div class="box"><b class="h">Första gången</b><p>Appen hämtar det den behöver för att läsa text, och det tar en liten stund. Gör det gärna hemma på wifi, så går det fort i butiken.</p></div>
+    </div>
+
+    <h3>Köpa något från listan</h3>
+    <p>På fliken Att köpa har varje sak en knapp <span class="ui">Köp</span>. Tryck på den, skanna eller skriv priset och tryck <span class="ui">Lägg i korgen</span>. Varan hamnar i korgen, avdelningen fylls i och saken bockas av på listan av sig själv.</p>
+  </section>
+
+  <section id="korgen">
+    <h2>5. Korgen</h2>
+    <ul>
+      <li>Överst står <b>totalen</b> och hur många varor du har.</li>
+      <li><span class="ui">Budget</span> (längst ner): skriv hur mycket du får handla för. Då ser du ”Kvar av budget” och en stapel som visar hur mycket som är använt.</li>
+      <li>Tryck på en varas namn för att ändra namn, pris, antal eller avdelning, eller för att ta bort varan.</li>
+      <li><span class="ui">Per avdelning</span> eller <span class="ui">Senaste först</span> styr ordningen.</li>
+      <li>Ångrade du dig? En ruta med <span class="ui">Ångra</span> dyker upp längst ner efter varje ändring. Den är kvar några sekunder.</li>
+      <li><span class="ui">Dela / kopiera lista</span> gör en textlista med allt i korgen och totalen.</li>
+    </ul>
+    <div class="box tip">
+      <b class="h">Två dagar i Ullared?</b>
+      <p>När du har betalat: tryck <span class="ui">Töm korgen</span> längst ner. Då börjar dag två på 0 kr. Inköpslistan, vagnnumret och parkeringen ligger kvar. Har du en budget för båda dagarna kan du ändra den till det som är kvar.</p>
+    </div>
+  </section>
+
+  <section id="karta">
+    <h2>6. Kartan</h2>
+    <p>Kartan är en förenklad ritning av varuhuset, gjord efter Gekås karta. Den öppnas på tre sätt:</p>
+    <ul>
+      <li>knappen <span class="ui">Karta</span> längst ner, som visar hela varuhuset,</li>
+      <li>den lila raden under en avdelning i listan, till exempel ”📍 Plan 1 · C4–C5, D4–D5”,</li>
+      <li><span class="ui">Visa på kartan</span> bredvid avdelningsvalet.</li>
+    </ul>
+    <p>Bokstaven och siffran (till exempel <b>C4</b>) står på <b>skyltarna i taket</b>. Rad A ligger vid kassorna och rad K längst in, och kolumn 1 är närmast ingången.</p>
+    <div class="map" role="img" aria-label="Exempel: Frukt och grönt på C4, C5, D4 och D5 är markerat">
+      <span class="ax">D</span><span>D2</span><span>D3</span><span class="on">D4</span><span class="on">D5</span><span>D6</span><span>D7</span>
+      <span class="ax">C</span><span>C2</span><span>C3</span><span class="on">C4</span><span class="on">C5</span><span>C6</span><span>C7</span>
+      <span class="ax">B</span><span>B2</span><span>B3</span><span>B4</span><span>B5</span><span>B6</span><span>B7</span>
+    </div>
+    <ul>
+      <li><b>Nedre plan</b> (Friluftsliv, Verktyg &amp; Bilvård, Hästsport, Husdjur) och <b>Övre plan</b> (Barnkläder): trappan vid J2.</li>
+      <li><b>Plan 2</b> (Skor, Jultorget &amp; Säsong): rulltrappan vid F10, vid Lek.</li>
+      <li>Tryck på en ruta på kartan för att se vad avdelningen heter.</li>
+    </ul>
+  </section>
+
+  <section id="vagn">
+    <h2>7. Kundvagn och bilen</h2>
+    <p>Överst på fliken Skanna finns <span class="ui">Kundvagn &amp; parkering</span>.</p>
+    <ul>
+      <li><b>Kundvagnsnummer:</b> skriv numret på din vagn. Det syns sedan hela tiden högst upp i appen.</li>
+      <li><b>Parkering:</b> skriv var du ställde bilen, till exempel ”Gul zon, rad 14”.</li>
+      <li><span class="ui">Spara plats</span> sparar var du står just nu (tillåt platsen). Platsen stannar i telefonen.</li>
+      <li><span class="ui">Hitta bilen</span> öppnar den sparade platsen i kartappen.</li>
+    </ul>
+  </section>
+
+  <section id="backup">
+    <h2>8. Backup och dela listan med någon</h2>
+    <p>Tryck <span class="ui">Backup</span> längst ner. Där kan du spara allt (korg, lista, avdelningar, vagn och parkering).</p>
+    <ul>
+      <li><span class="ui">Kopiera som kod</span>: kopierar en lång kod. Klistra in den i ett sms eller en anteckning till dig själv.</li>
+      <li><span class="ui">Exportera fil</span>: sparar en fil i telefonen.</li>
+      <li>För att läsa in: tryck <span class="ui">Backup</span>, klistra in koden (eller välj filen) och tryck <span class="ui">Läs in koden</span>. Välj sedan <span class="ui">Slå ihop</span> (lägger till det som saknas) eller <span class="ui">Ersätt allt</span>. Båda går att ångra.</li>
+    </ul>
+    <div class="box tip">
+      <b class="h">Ge din inköpslista till någon annan</b>
+      <ol>
+        <li>Tryck <span class="ui">Dela listan</span> längst ner på fliken Att köpa och skicka den, till exempel i WhatsApp.</li>
+        <li>Den som får listan håller fingret på meddelandet och väljer <b>Kopiera</b>.</li>
+        <li>I sin egen app: fliken Att köpa, <span class="ui">Lägg till på listan</span>, <span class="ui">Klistra in flera</span>, klistra in och tryck <span class="ui">Lägg till</span>.</li>
+      </ol>
+      <p>Personer, avdelningar, maxpris, länkar och det som redan är avbockat följer med. Klistra bara in samma lista en gång, annars kommer allt in två gånger. Det går att ångra direkt.</p>
+    </div>
+  </section>
+
+  <section id="fragor">
+    <h2>9. Vanliga frågor</h2>
+    <h3>Appen läste fel pris.</h3>
+    <p>Tryck på rätt tal bland knapparna eller skriv in priset själv. Små ören uppe till höger (49⁹⁰) blir ibland bara 49, så kolla dem extra.</p>
+    <h3>Namnet blev konstigt.</h3>
+    <p>Skriv över det. Appen skriver aldrig över ett namn du har skrivit själv.</p>
+    <h3>Kameran startar inte.</h3>
+    <p>Kolla att du har tillåtit kameran för webbplatsen i telefonens inställningar, eller använd <span class="ui">Ta bild istället</span>.</p>
+    <h3>Jag ser inte det senaste i appen.</h3>
+    <p>Ladda om sidan en gång. På hemskärmen: stäng appen helt och öppna den igen.</p>
+    <h3>Kan vi dela en korg i familjen?</h3>
+    <p>Nej, varje telefon har sin egen. Men inköpslistan kan skickas med <span class="ui">Dela listan</span> och klistras in hos den andra (se <a href="#backup" style="color:var(--accent)">Backup och dela listan</a>).</p>
+    <h3>Vad gör knappen Avdelningar?</h3>
+    <p>Där kan du ändra ordningen på avdelningarna, byta namn eller lägga till egna. Du behöver inte röra den.</p>
+  </section>
+
+  <footer>Ullared-kassan är en privat app i familjen, inte gjord av Gekås. Kontrollera alltid priset vid kassan.</footer>
+</div>
+</body>
+</html>
