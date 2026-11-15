@@ -1847,19 +1847,40 @@
   /* Klistra in flera */
   $('wBulk').onclick = function () { $('bText').value = ''; $('bPerson').value = $('wPerson').value; $('bulkDlg').showModal(); };
   $('bulkCancel').onclick = function () { $('bulkDlg').close(); };
+  // Läser både egen text och en lista som delats med "Dela listan" från en annan telefon:
+  //   Emma:                       ← rubrik = person (eller avdelning, se nedan)
+  //   [ ] Vinterskor max 300 kr   ← [ ] = kvar, [x] = klar
+  //   Kroppsvård (Plan 1 · A1–A2):  ← rubrik som är en avdelning = avdelning för raderna under
+  //   [ ] Tandkräm (Emma)          ← person i parentes sist
   $('bulkForm').onsubmit = function () {
-    var cur = $('bPerson').value.trim(), n = 0, add = [], bulkDept = deptById($('bDept').value) ? $('bDept').value : '';
+    var basePerson = $('bPerson').value.trim(), cur = basePerson, n = 0, add = [];
+    var bulkDept = deptById($('bDept').value) ? $('bDept').value : '', curDept = bulkDept, deptHeads = false;
+    var byName = {};
+    state.departments.forEach(function (d) { byName[d.name.toLowerCase()] = d.id; });
     $('bText').value.split('\n').forEach(function (line) {
       line = line.trim(); if (!line) return;
-      var head = line.match(/^([^:]{1,30}):$/);
-      if (head) { cur = head[1].trim(); return; }
+      var head = line.match(/^([^:]{1,80}):$/);
+      if (head) {
+        var hn = head[1].trim(), bare = hn.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+        if (byName[bare]) { curDept = byName[bare]; deptHeads = true; cur = basePerson; return; }
+        if (bare === 'övrigt') { if (deptHeads) curDept = bulkDept; else cur = ''; return; }
+        if (hn.length <= 30) { cur = hn; return; }
+      }
+      var done = false, person = cur, cm = line.match(/^\[([ xX✓]?)\]\s*/);
+      if (cm) { done = /[xX✓]/.test(cm[1]); line = line.slice(cm[0].length); }
       line = line.replace(/^[-*•·\u2022]+\s*/, '').replace(/^\d+[.)]\s+/, '').trim();
       var um = line.match(/\s*(\S+\.\S+)\s*$/), url = '';
       if (um && safeUrl(um[1]) && /^(https?:\/\/|www\.)/i.test(um[1])) { url = safeUrl(um[1]); line = line.slice(0, um.index).trim(); }
-      // "Vinterskor max 300" eller "Vinterskor (max 300 kr)" ger maxpris 300
-      var mm = line.match(/[\s,(]*\bmax\.?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:kr|:-)?\)?\s*$/i), max = 0;
+      // "· Kosmetik" sist i en delad lista är avdelningen.
+      var lineDept = curDept, dm = cm ? line.match(/\s+·\s+([^·]{1,60})$/) : null;
+      if (dm && byName[dm[1].trim().toLowerCase()]) { lineDept = byName[dm[1].trim().toLowerCase()]; line = line.slice(0, dm.index).trim(); }
+      // "(Emma)" sist i en delad lista är personen. Bara i delade listor (rader med [ ]), så att "Jeans (blå)" får vara kvar.
+      var pm = cm ? line.match(/\s*\(([^()]{1,30})\)\s*$/) : null;
+      if (pm && !/^max\b/i.test(pm[1])) { person = pm[1].trim(); line = line.slice(0, pm.index).trim(); }
+      // "Vinterskor max 300", "Vinterskor (max 300 kr)" eller "max 1 200 kr" ger maxpris
+      var mm = line.match(/[\s,(]*\bmax\.?\s*(\d{1,3}(?:[\s\u00a0\u202f]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:kr|:-)?\)?\s*$/i), max = 0;
       if (mm) { max = Math.max(0, parseMax(mm[1])); line = line.slice(0, mm.index).trim(); }
-      if (line) { add.push({ id: uid(), text: line, person: cur, done: false, img: url, dept: bulkDept, max: max }); n++; }
+      if (line) { add.push({ id: uid(), text: line, person: person, done: done, img: url, dept: lineDept, max: max }); n++; }
     });
     if (!n) return;
     snap('la till ' + n + ' i listan');
@@ -1869,7 +1890,9 @@
   /* Dela / ta bort klara */
   $('wShare').onclick = function () {
     var lines = [], ppl = people().concat(['']), line = function (w, who) {
-      return (w.done ? '[x] ' : '[ ] ') + w.text + (w.max ? ' max ' + fmt(w.max) : '') + (who && w.person ? ' (' + w.person + ')' : '') + (w.img ? ' ' + w.img : '');
+      // Per person: avdelningen står sist efter en punkt, så att den följer med när listan klistras in i en annan telefon.
+      var d = !who && deptById(w.dept);
+      return (w.done ? '[x] ' : '[ ] ') + w.text + (w.max ? ' max ' + fmt(w.max) : '') + (who && w.person ? ' (' + w.person + ')' : '') + (d ? ' · ' + d.name : '') + (w.img ? ' ' + w.img : '');
     };
     if (state.view.wishes === 'dept') {
       groupByDept(state.wishes).forEach(function (g) {
