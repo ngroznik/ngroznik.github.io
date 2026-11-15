@@ -425,6 +425,7 @@
 
 <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button id="toastUndo">Ångra</button></div>
 
+  <button type="button" class="btn routebtn" id="routeBtn" hidden></button>
 <dialog id="editDlg">
   <form method="dialog" id="editForm">
     <label for="eName">Namn</label>
@@ -560,6 +561,8 @@
     <button type="button" class="btn" id="deptNewAdd">Lägg till</button>
   </div>
   <div class="row">
+  <ol class="routelist" id="routeList" hidden></ol>
+  <button type="button" class="maplink mapback" id="mapBack" hidden>← Tillbaka till rutten</button>
     <button type="button" class="btn" id="deptSetUndo">Ångra</button>
     <button type="button" class="btn" id="deptSetReset">Återställ standard</button>
   </div>
@@ -1347,31 +1350,114 @@
   function svgText(parent, x, y, txt, cls) { var t = svgEl('text', { x: x, y: y, 'class': cls || '' }, parent); t.textContent = txt; return t; }
   function deptAtCell(c) { return state.departments.find(function (d) { return d.cells && d.cells.indexOf(c) >= 0; }); }
 
-  var mapDept = '';
-  function openMap(id) { mapDept = deptById(id) ? id : ''; drawMap(); if (!$('mapDlg').open) $('mapDlg').showModal(); }
+  var mapDept = '', mapRoute = null, lastRoute = null;
+  function openMap(id) { mapRoute = null; lastRoute = null; mapDept = deptById(id) ? id : ''; drawMap(); if (!$('mapDlg').open) $('mapDlg').showModal(); }
+
+  /* ---------- Rutt för listan ----------
+     Saker som inte är klara (och tillhör vald person) samlas per avdelning. Avdelningar på Plan 1 är ett stopp var,
+     de på andra plan ett gemensamt stopp vid trappan. Ordningen: närmaste stopp först från ingången, sedan
+     förbättrad med 2-opt så att vägen till kassorna blir så kort som möjligt (räknat i takkuber, rakt längs gångarna). */
+  var ROWS = 'ABCDEFGHIJK';
+  function cellPos(code) { var m = /^([A-K])(\d{1,2})$/.exec(code || ''); return m ? { c: +m[2], r: ROWS.indexOf(m[1]) } : null; }
+  function routeWishes() {
+    return state.wishes.filter(function (w) { return !w.done && !(wishFilter && w.person !== wishFilter); });
+  }
+  function buildRoute() {
+    var byDept = {}, noPlace = 0, total = 0;
+    routeWishes().forEach(function (w) {
+      var d = deptById(w.dept);
+      if (!d || !(d.cells && d.cells.length) && !d.via) { noPlace++; return; }
+      (byDept[d.id] = byDept[d.id] || { dept: d, wishes: [] }).wishes.push(w); total++;
+    });
+    var stops = [], floorStop = {};
+    sortedDepts().forEach(function (d) {
+      var g = byDept[d.id]; if (!g) return;
+      if (d.cells && d.cells.length) {
+        var ps = d.cells.map(cellPos).filter(Boolean), c = 0, r = 0;
+        ps.forEach(function (p) { c += p.c; r += p.r; });
+        stops.push({ c: c / ps.length, r: r / ps.length, groups: [g] });
+      } else {
+        var key = d.via;   // Nedre och Övre plan nås från samma trappa: ett stopp
+        if (!floorStop[key]) { var p = cellPos(d.via) || { c: 2, r: 9 }; floorStop[key] = { c: p.c, r: p.r, via: d.via, groups: [] }; stops.push(floorStop[key]); }
+        floorStop[key].groups.push(g);
+      }
+    });
+    var start = { c: 1, r: -1.5 }, end = { c: 10.5, r: -1.5 };
+    var dist = function (p, q) { return Math.abs(p.c - q.c) + Math.abs(p.r - q.r); };
+    // Närmaste granne från ingången …
+    var left = stops.slice(), path = [start], cur = start;
+    while (left.length) {
+      var bi = 0; left.forEach(function (s, i) { if (dist(cur, s) < dist(cur, left[bi])) bi = i; });
+      cur = left.splice(bi, 1)[0]; path.push(cur);
+    }
+    path.push(end);
+    // … och 2-opt: vänd delsträckor så länge vägen blir kortare. Ingång och kassor ligger fast.
+    var better = true, guard = 0;
+    while (better && guard++ < 200) {
+      better = false;
+      for (var i = 1; i < path.length - 2; i++) for (var j = i + 1; j < path.length - 1; j++) {
+        var before = dist(path[i - 1], path[i]) + dist(path[j], path[j + 1]), after = dist(path[i - 1], path[j]) + dist(path[i], path[j + 1]);
+        if (after < before - 1e-9) { path = path.slice(0, i).concat(path.slice(i, j + 1).reverse(), path.slice(j + 1)); better = true; }
+      }
+    }
+    var order = [], vias = {};
+    path.slice(1, -1).forEach(function (s) {
+      if (s.via) vias[s.via] = 1;
+      s.groups.forEach(function (g) { g.n = order.length + 1; order.push(g); });
+    });
+    return { path: path, order: order, vias: vias, total: total, noPlace: noPlace, who: wishFilter };
+  }
+  function openRoute() {
+    mapRoute = lastRoute = buildRoute(); mapDept = '';
+    drawMap(); if (!$('mapDlg').open) $('mapDlg').showModal();
+  }
+  function routeCount() {
+    var ids = {};
+    routeWishes().forEach(function (w) { var d = deptById(w.dept); if (d && (d.via || (d.cells && d.cells.length))) ids[d.id] = 1; });
+    return Object.keys(ids).length;
+  }
+  function syncRouteBtn() {
+    var n = routeCount(), b = $('routeBtn');
+    b.hidden = n < 1;
+    b.textContent = 'Visa rutten på kartan (' + n + (n === 1 ? ' avdelning)' : ' avdelningar)');
+  }
+  $('routeBtn').onclick = openRoute;
+  $('mapBack').onclick = function () { mapRoute = lastRoute; mapDept = ''; drawMap(); };
+
   function drawMap() {
-    var d = deptById(mapDept), box = $('mapBox');
-    $('mapTitle').textContent = d ? d.name : 'Karta';
-    $('mapWhere').textContent = d ? (deptWhere(d) || 'Den här avdelningen har inget läge på kartan.') : 'Tryck på en avdelning.';
-    $('mapSecs').textContent = d && d.sections && d.sections.length ? d.sections.join(', ') : '';
+    var route = mapRoute, d = route ? null : deptById(mapDept), box = $('mapBox'), num = {};
+    if (route) route.order.forEach(function (g) { num[g.dept.id] = g.n; });
+    var isOn = function (x) { return !!x && (route ? !!num[x.id] : x === d); };
+    var focus = !!(route || d);
+    if (route) {
+      $('mapTitle').textContent = 'Rutt' + (route.who ? ' för ' + route.who : '');
+      $('mapWhere').textContent = route.order.length + (route.order.length === 1 ? ' avdelning' : ' avdelningar') + ' · ' + route.total + (route.total === 1 ? ' sak' : ' saker') + ', från ingången till kassorna';
+      $('mapSecs').textContent = route.noPlace ? route.noPlace + (route.noPlace === 1 ? ' sak har' : ' saker har') + ' ingen avdelning och visas inte.' : '';
+    } else {
+      $('mapTitle').textContent = d ? d.name : 'Karta';
+      $('mapWhere').textContent = d ? (deptWhere(d) || 'Den här avdelningen har inget läge på kartan.') : 'Tryck på en avdelning.';
+      $('mapSecs').textContent = d && d.sections && d.sections.length ? d.sections.join(', ') : '';
+    }
+    $('mapBack').hidden = !(lastRoute && !route);
     box.innerHTML = '';
-    var W = 27, H = 22, L = 16, T = 14, rows = 'ABCDEFGHIJK';
+    var W = 27, H = 22, L = 16, T = 14;
+    var px = function (p) { return { x: L + (p.c - .5) * W, y: T + (10 - p.r) * H + H / 2 }; };
     var svg = svgEl('svg', { viewBox: '0 0 ' + (L + 12 * W + 2) + ' ' + (T + 11 * H + 34), 'class': 'map', role: 'img',
-      'aria-label': 'Karta över Plan 1' + (d ? ', ' + d.name + ' är markerad' : '') }, box);
+      'aria-label': 'Karta över Plan 1' + (route ? ', rutten är markerad' : d ? ', ' + d.name + ' är markerad' : '') }, box);
     for (var c = 1; c <= 12; c++) svgText(svg, L + (c - .5) * W, 10, String(c), 'axis');
     for (var r = 0; r < 11; r++) {
       var y = T + (10 - r) * H;
-      svgText(svg, 7, y + H / 2 + 3, rows[r], 'axis');
+      svgText(svg, 7, y + H / 2 + 3, ROWS[r], 'axis');
       for (c = 1; c <= 12; c++) {
-        var id = rows[r] + c, cd = deptAtCell(id), svc = MAP_SVC[id];
+        var id = ROWS[r] + c, cd = deptAtCell(id), svc = MAP_SVC[id];
         if (!cd && !svc) continue;
-        var on = !!d && cd === d, via = !!d && d.via === id;
+        var on = isOn(cd), via = route ? !!route.vias[id] : !!d && d.via === id;
         var g = svgEl('g', { 'class': 'cell' + (on ? ' on' : '') + (via ? ' via' : '') + (svc && !cd ? ' svc' : ''), 'data-dept': cd ? cd.id : '', 'data-name': cd ? cd.name : svc }, svg);
         var rc = svgEl('rect', { x: L + (c - 1) * W + 1, y: y + 1, width: W - 2, height: H - 2, rx: 3 }, g);
         if (cd && !on && !via) rc.style.fill = cd.color || '';
-        if (d && !on && !via) g.style.opacity = '.3';
-        if (on || via) svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, id, 'code');
-        else if (id === 'J2') svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, '⇅', 'code');
+        if (focus && !on && !via) g.style.opacity = '.3';
+        if (!route && (on || via)) svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, id, 'code');
+        else if (id === 'J2' && !on && !via) svgText(g, L + (c - .5) * W, y + H / 2 + 3.5, '⇅', 'code');
       }
     }
     var by = T + 11 * H + 4;
@@ -1379,28 +1465,44 @@
     svgText(svg, L + 5.5 * W, by + 8.5, 'Kassor', 'small');
     svgText(svg, L + 2, by + 25, '← Ingång', 'small start');
     svgText(svg, L + 10 * W, by + 25, 'Utgång →', 'small');
-    // Planen en trappa upp och ner: bara det som behövs, eller alla när ingen avdelning är vald.
+    if (route) {
+      // Linje från ingången genom stoppen till kassorna, och en siffra på varje stopp.
+      var pts = route.path.map(function (p, i) {
+        if (i === 0) return { x: L + 6, y: by + 21 };
+        if (i === route.path.length - 1) return { x: L + 10 * W, y: by + 5 };
+        return px(p);
+      });
+      svgEl('polyline', { points: pts.map(function (p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' '), 'class': 'route' }, svg);
+      route.path.slice(1, -1).forEach(function (s) {
+        var p = px(s), first = s.groups[0].n, last = s.groups[s.groups.length - 1].n;
+        // Trappstoppen hamnar i hörnet av rutan så de inte täcker en avdelning i samma ruta (t.ex. Lek vid F10).
+        badge(svg, p.x + (s.via ? 9 : 0), p.y - (s.via ? 8 : 0), first === last ? String(first) : first + '–' + last);
+      });
+    }
+    // Planen en trappa upp och ner: bara det som behövs, eller alla när inget är valt.
     FLOORS.forEach(function (fl) {
       if (d && d.level !== fl.level) return;
       var BW = 170, rowsN = fl.blocks.some(function (bl) { return bl.y >= 1; }) ? 2 : 1;
       var s2 = svgEl('svg', { viewBox: '0 0 ' + (2 * BW + 2) + ' ' + (rowsN * 40 + 18), 'class': 'map floor', role: 'img',
-        'aria-label': fl.level + (d ? ', ' + d.name + ' är markerad' : '') }, box);
+        'aria-label': fl.level + (route ? ', rutten är markerad' : d ? ', ' + d.name + ' är markerad' : '') }, box);
       svgText(s2, 1, 11, fl.level + (fl.level === 'Plan 2' ? ' · rulltrappa vid F10' : ' · trappa vid J2'), 'floorname');
       fl.blocks.forEach(function (bl) {
-        var bd = deptById(bl.dept), on = !!d && bd === d;
+        var bd = deptById(bl.dept), on = isOn(bd);
         var g = svgEl('g', { 'class': 'cell' + (on ? ' on' : '') + (bd ? '' : ' svc'), 'data-dept': bd ? bd.id : '', 'data-name': bl.t }, s2);
         var rc = svgEl('rect', { x: bl.x * BW + 1, y: 16 + bl.y * 40 + 1, width: bl.w * BW - 2, height: bl.h * 40 - 2, rx: 4 }, g);
         if (bd && !on) rc.style.fill = bd.color || '';
-        if (d && !on) g.style.opacity = '.3';
+        if (focus && !on) g.style.opacity = '.3';
         svgText(g, (bl.x + bl.w / 2) * BW, 16 + (bl.y + bl.h / 2) * 40 + 4, bl.t, 'blk');
       });
     });
   }
   // Tryck på en ruta: visa den avdelningen (eller namnet på t.ex. Sportbaren).
+      if (route && !route.order.some(function (g) { return g.dept.level === fl.level; })) return;
   $('mapBox').onclick = function (e) {
     var g = e.target.closest && e.target.closest('.cell'); if (!g) return;
     var id = g.getAttribute('data-dept');
-    mapDept = id || ''; drawMap();
+    mapRoute = null; mapDept = id || ''; drawMap();
+      var done = {};
     if (!id) $('mapWhere').textContent = g.getAttribute('data-name');
   };
   $('mapClose').onclick = function () { $('mapDlg').close(); };
@@ -1408,8 +1510,29 @@
   $('mapBtn2').onclick = function () { openMap(''); };
 
   /* Inställning: ordning, namn, egna avdelningar, återställ */
+        if (route && on && !done[bd.id]) { done[bd.id] = 1; badge(s2, bl.x * BW + 12, 16 + bl.y * 40 + 12, String(num[bd.id])); }
   function renderDeptSettings() {
     var list = sortedDepts(), box = $('deptSetList'); box.innerHTML = '';
+    // Listan under kartan: i ruttens ordning, med sakerna.
+    var ol = $('routeList'); ol.innerHTML = ''; ol.hidden = !route;
+    if (route) route.order.forEach(function (g) {
+      var li = document.createElement('li'), bt = document.createElement('button'); bt.type = 'button';
+      var nb = document.createElement('span'); nb.className = 'rn'; nb.textContent = g.n; bt.appendChild(nb);
+      var tx = document.createElement('span'); tx.className = 'rt';
+      var nm = document.createElement('b'); nm.textContent = g.dept.name; tx.appendChild(nm);
+      var wh = document.createElement('small'); wh.textContent = deptWhere(g.dept); tx.appendChild(wh);
+      var it = document.createElement('span'); it.className = 'ri';
+      it.textContent = g.wishes.map(function (w) { return w.text + (w.person && !route.who ? ' (' + w.person + ')' : ''); }).join(', ');
+      tx.appendChild(it); bt.appendChild(tx);
+      bt.setAttribute('aria-label', g.n + '. ' + g.dept.name + ': ' + it.textContent + '. Visa på kartan');
+      bt.onclick = function () { mapRoute = null; mapDept = g.dept.id; drawMap(); $('mapDlg').scrollTop = 0; };
+      li.appendChild(bt); ol.appendChild(li);
+    });
+  }
+  function badge(parent, x, y, txt) {
+    var g = svgEl('g', { 'class': 'badge' }, parent);
+    svgEl('rect', { x: x - (txt.length > 2 ? 12 : 7.5), y: y - 7.5, width: txt.length > 2 ? 24 : 15, height: 15, rx: 7.5 }, g);
+    svgText(g, x, y + 3.2, txt, '');
     list.forEach(function (d, i) {
       var row = document.createElement('div'); row.className = 'deptrow';
       var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
@@ -1522,7 +1645,7 @@
     }
 
     var hide = $('hideDone').checked, byDept = state.view.wishes === 'dept';
-    $('wishView').hidden = !ws.length; syncSeg('wishView', state.view.wishes);
+    $('wishView').hidden = !ws.length; syncSeg('wishView', state.view.wishes); syncRouteBtn();
     var shown = ws.filter(function (w) { return !(hide && w.done) && !(wishFilter && w.person !== wishFilter); });
     var sections = [];
     if (byDept) {
