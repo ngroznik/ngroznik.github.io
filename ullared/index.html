@@ -1313,9 +1313,12 @@
     if (groups['']) out.push({ dept: null, list: groups[''] });
     return out;
   }
-  function groupHead(title, right, dept) {
+  function groupHead(title, right, dept, stop) {
     var g = document.createElement('div'); g.className = 'grouphead';
-    var hh = document.createElement('h3'); hh.textContent = title;
+    var hh = document.createElement('h3'), tt = document.createElement('span'); tt.className = 'ttl';
+    // Stoppets nummer i rutten (samma som på kartan)
+    if (stop) { var rn = document.createElement('span'); rn.className = 'rn'; rn.textContent = stop; rn.setAttribute('aria-label', 'Stopp ' + stop + ':'); tt.appendChild(rn); }
+    tt.appendChild(document.createTextNode(title)); hh.appendChild(tt);
     var sm = document.createElement('small'); sm.textContent = right; hh.appendChild(sm); g.appendChild(hh);
     var where = deptWhere(dept);
     if (where) {
@@ -1664,7 +1667,12 @@
     var shown = ws.filter(function (w) { return !(hide && w.done) && !(wishFilter && w.person !== wishFilter); });
     var sections = [];
     if (byDept) {
-      groupByDept(shown).forEach(function (g) { sections.push({ title: g.dept ? g.dept.name : 'Övrigt', dept: g.dept, list: g.list }); });
+      // I ruttens ordning (samma som kartan): avdelningar med saker kvar först, numrerade; resten efter i vanlig ordning.
+      var stopOf = {};
+      buildRoute().order.forEach(function (r) { stopOf[r.dept.id] = r.n; });
+      groupByDept(shown).map(function (g, i) { return { g: g, i: i, n: g.dept ? stopOf[g.dept.id] || 0 : 0 }; })
+        .sort(function (a, b) { return (a.n ? 0 : 1) - (b.n ? 0 : 1) || (a.n - b.n) || (a.i - b.i); })
+        .forEach(function (x) { var g = x.g; sections.push({ title: g.dept ? g.dept.name : 'Övrigt', dept: g.dept, list: g.list, stop: x.n }); });
     } else {
       var groups = {}, order = ppl.slice();
       shown.forEach(function (w) { var key = w.person || 'Övrigt'; (groups[key] = groups[key] || []).push(w); });
@@ -1677,7 +1685,7 @@
       arr.sort(function (a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); });
       var sec = document.createElement('div'); sec.className = 'wishgroup';
       var left2 = arr.filter(function (w) { return !w.done; }).length;
-      sec.appendChild(groupHead(s.title, left2 + ' kvar', s.dept));
+      sec.appendChild(groupHead(s.title, left2 + ' kvar', s.dept, s.stop));
       arr.forEach(function (w) {
         var row = document.createElement('div'); row.className = 'wish' + (w.done ? ' done' : '');
         var chk = document.createElement('button'); chk.className = 'check'; chk.setAttribute('role', 'checkbox');
