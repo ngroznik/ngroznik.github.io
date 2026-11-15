@@ -887,7 +887,7 @@
     save(); render();
     var dd = deptById(dept);
     toast('Tillagd: ' + (name ? name + ', ' : '') + qty + ' × ' + fmt(p) + (dd ? ' · ' + dd.name : ''), true);
-    $('price').value = ''; $('img').value = ''; $('name').value = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
+    $('price').value = ''; $('img').value = ''; $('name').value = ''; lastScanTitle = ''; $('chips').innerHTML = ''; setQty(1); setStatus('');
     if (navigator.vibrate) navigator.vibrate(30);
   }
   $('addBtn').onclick = add;
@@ -987,6 +987,80 @@
         .then(function () { worker = w; setStatus(''); return w; });
     });
     return workerLoading;
+  }
+
+  // Läsare för ord på skylten (svenska, så att å, ä och ö blir rätt). Laddas först när den behövs.
+  var textWorker = null, textLoading = null, lastScanTitle = '';
+  function loadTextWorker() {
+    if (textWorker) return Promise.resolve(textWorker);
+    if (textLoading) return textLoading;
+    if (!window.Tesseract) return Promise.reject();
+    textLoading = Tesseract.createWorker('swe').then(function (w) {
+      return w.setParameters({ tessedit_pageseg_mode: '11' }).then(function () { textWorker = w; return w; });
+    });
+    textLoading.catch(function () { textLoading = null; });
+    return textLoading;
+  }
+  // Ord som står på många skyltar men inte är varans namn.
+  var TAG_WORDS = { kr: 1, st: 1, pris: 1, jmf: 1, jfr: 1, jmfpris: 1, 'jämförpris': 1, 'jämförelsepris': 1, ord: 1, ordpris: 1, ordinarie: 1, art: 1, artnr: 1,
+    nr: 1, gekås: 1, gekas: 1, ullared: 1, nu: 1, 'lågpris': 1, fynd: 1, per: 1, kg: 1, hg: 1, liter: 1, 'förp': 1, ca: 1, max: 1, inkl: 1, moms: 1, sek: 1,
+    rea: 1, kampanj: 1, 'köp': 1, 'för': 1, betala: 1, spara: 1, 'från': 1 };
+  // Plockar ut varans namn ur orden: raden med störst bokstäver (priset är siffror och räknas inte),
+  // plus raden strax under om den har lika stora bokstäver ("Barnjeans" / "stl 122-158").
+  function titleFromWords(words) {
+    var ws = (words || []).map(function (w) {
+      var b = w.bbox || {}, t = String(w.text || '').replace(/^[^0-9a-zåäöéü]+|[^0-9a-zåäöéü%]+$/gi, '');
+      return { t: t, x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1, h: (b.y1 - b.y0) || 0, conf: w.confidence || 0 };
+    }).filter(function (w) {
+      var letters = (w.t.match(/[a-zåäöéü]/gi) || []).length, low = w.t.toLowerCase().replace(/[.:]/g, '');
+      w.num = /^\d[\d\-x,./]{0,8}\d$|^\d$/i.test(w.t);   // tal som "122-158" eller "50x70" får följa med en rad
+      if (!w.h || w.conf < 55 || (!letters && !w.num)) return false;
+      if (w.num) return true;
+      if (TAG_WORDS[low]) return false;
+      if (letters === 1 && w.t.length === 1) return false;                         // lösa bokstäver är oftast brus
+      return letters / w.t.length >= .5 || /^\d+(ml|cl|dl|l|g|kg|cm|mm|m|st|p|pack|-?pack)$/i.test(w.t);   // "75ml", "3-pack"
+    });
+    var nums = ws.filter(function (w) { return w.num; }); ws = ws.filter(function (w) { return !w.num; });
+    if (!ws.length) return '';
+    // Ordna i rader: samma höjd i bilden och ungefär samma storlek.
+    ws.sort(function (a, b) { return (a.y0 + a.y1) - (b.y0 + b.y1); });
+    var lines = [];
+    ws.forEach(function (w) {
+      var yc = (w.y0 + w.y1) / 2, ln = lines.find(function (l) { return Math.abs(l.yc - yc) < Math.max(l.h, w.h) * .5 && Math.max(l.h, w.h) / Math.min(l.h, w.h) < 1.6; });
+      if (ln) { ln.words.push(w); ln.h = Math.max(ln.h, w.h); ln.y1 = Math.max(ln.y1, w.y1); } else lines.push({ yc: yc, h: w.h, y0: w.y0, y1: w.y1, words: [w] });
+    });
+    // Tal i samma rad och storlek som orden hör till namnet (priset är mycket större och kommer inte med).
+    nums.forEach(function (w) {
+      var yc = (w.y0 + w.y1) / 2, ln = lines.find(function (l) { return Math.abs(l.yc - yc) < l.h * .5 && w.h > l.h * .6 && w.h < l.h * 1.4; });
+      if (ln) ln.words.push(w);
+    });
+    lines.forEach(function (l) {
+      l.words.sort(function (a, b) { return a.x0 - b.x0; });
+      l.text = l.words.map(function (w) { return w.t; }).join(' ');
+      var conf = l.words.reduce(function (s, w) { return s + w.conf; }, 0) / l.words.length;
+      l.score = l.h * (conf / 100) * ((l.text.match(/[a-zåäöéü]/gi) || []).length >= 3 ? 1 : .3);
+    });
+    lines.sort(function (a, b) { return b.score - a.score; });
+    var best = lines[0]; if (!best || (best.text.match(/[a-zåäöéü]/gi) || []).length < 3) return '';
+    var next = lines.find(function (l) { return l !== best && l.y0 > best.y0 && l.y0 - best.y1 < best.h * 1.2 && l.h > best.h * .75 && l.h < best.h * 1.3; });
+    var t = best.text + (next ? ' ' + next.text : '');
+    // VERSALER blir vanlig text: "TANDKRÄM 75 ML" → "Tandkräm 75 ml"
+    if ((t.match(/[a-zåäöéü]/g) || []).length === 0) t = t.toLowerCase();
+    t = t.replace(/\s+/g, ' ').trim();
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    return t.length > 50 ? t.slice(0, 50).replace(/\s+\S*$/, '') : t;
+  }
+  // Läser namnet efter priset (priset visas direkt). Skriver bara i namnfältet om det är tomt
+  // eller fortfarande har namnet från förra läsningen, så att det man skrivit själv aldrig skrivs över.
+  function readTitle(canvas) {
+    var nm = $('name').value.trim();
+    if (nm && nm !== lastScanTitle) return;
+    loadTextWorker().then(function (w) { return w.recognize(canvas); }).then(function (r) {
+      var t = titleFromWords(r.data.words), cur = $('name').value.trim();
+      if (!t || (cur && cur !== lastScanTitle)) return;
+      $('name').value = t; lastScanTitle = t;
+      setStatus($('status').textContent + ' Namnet är läst från skylten – ändra om det blev fel.');
+    }).catch(function () {});
   }
 
   // Vilken del av kamerabilden syns i ramen? Videon beskärs (object-fit: cover), så ramens
@@ -1124,7 +1198,7 @@
   // Läser båda varianterna av bilden och väljer kandidaten med störst och säkrast siffror.
   function recognize(variants) {
     setStatus('Läser…'); $('scanBtn').disabled = true;
-    var w0, all = [];
+    var w0, all = [], forTitle = variants[1] || variants[0];
     function readOne(i) {
       if (i >= variants.length) return Promise.resolve();
       return w0.setParameters({ tessedit_pageseg_mode: '11' }).then(function () { return w0.recognize(variants[i]); })
@@ -1154,7 +1228,7 @@
         return w0.setParameters({ tessedit_pageseg_mode: '7' }).then(function () { return w0.recognize(canvas); })
           .then(function (r2) { var q = pricesFromWords(r2.data.words).map(function (x) { return x.p; }); return q.length ? q : extractPrices(r2.data.text); });
       })
-      .then(function (prices) { showResult(prices); })
+      .then(function (prices) { showResult(prices); readTitle(forTitle); })
       .catch(function () { setStatus('Något gick fel vid läsningen. Skriv in priset själv.'); })
       .then(function () { $('scanBtn').disabled = !stream; });
   }
