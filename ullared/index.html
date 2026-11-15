@@ -204,6 +204,21 @@
   .map text.blk { font-size:11px; font-weight:600; stroke:#1b1446; stroke-width:3px; stroke-linejoin:round; paint-order:stroke; }
   .map text.floorname { text-anchor:start; fill:var(--accent); font-size:11px; font-weight:600; }
   .map .kassor { fill:#2f3d6e; }
+  .map .route { fill:none; stroke:#fff; stroke-width:2; stroke-dasharray:4 3; stroke-linejoin:round; opacity:.85; pointer-events:none; }
+  .map .badge { pointer-events:none; }
+  .map .badge rect { fill:#1b1446; stroke:var(--tag); stroke-width:1.5; }
+  .map .badge text { fill:var(--tag); font-size:9px; font-weight:700; stroke:none; }
+  .routebtn { width:100%; margin-top:10px; }
+  .mapback { margin-top:10px; }
+  .routelist { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:6px; }
+  .routelist button { display:flex; gap:10px; align-items:flex-start; width:100%; min-height:44px; padding:8px 12px; text-align:left; font:inherit;
+    color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-s); background:var(--surface); cursor:pointer; }
+  .routelist .rn { flex:none; min-width:22px; height:22px; border-radius:999px; display:grid; place-items:center; font-size:12px; font-weight:700;
+    color:var(--tag); border:1.5px solid var(--tag); }
+  .routelist .rt { min-width:0; }
+  .routelist b { display:block; font-size:15px; font-weight:600; }
+  .routelist small { display:block; font-size:12px; color:var(--accent); }
+  .routelist .ri { display:block; font-size:13px; color:var(--muted); }
   .picklist { display:grid; gap:6px; max-height:60vh; overflow:auto; margin:12px 0; padding:2px; }
   .picklist button { min-height:44px; text-align:left; padding:6px 14px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface); }
   .picklist button b { display:block; font-size:15px; font-weight:600; }
@@ -410,6 +425,7 @@
     <button type="button" data-view="dept">Per avdelning</button>
   </div>
   <div class="filters" id="wishFilter"></div>
+  <button type="button" class="btn routebtn" id="routeBtn" hidden></button>
   <label class="check-row"><input type="checkbox" id="hideDone"> Dölj de som är klara</label>
   <div id="wishes"></div>
   <div class="empty" id="wishEmpty">Listan är tom. Lägg till önskningar ovan.</div>
@@ -425,7 +441,6 @@
 
 <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button id="toastUndo">Ångra</button></div>
 
-  <button type="button" class="btn routebtn" id="routeBtn" hidden></button>
 <dialog id="editDlg">
   <form method="dialog" id="editForm">
     <label for="eName">Namn</label>
@@ -546,6 +561,8 @@
   <p class="mapwhere" id="mapWhere"></p>
   <p class="small mapsecs" id="mapSecs"></p>
   <div class="mapbox" id="mapBox"></div>
+  <ol class="routelist" id="routeList" hidden></ol>
+  <button type="button" class="maplink mapback" id="mapBack" hidden>← Tillbaka till rutten</button>
   <p class="small" style="margin:6px 0 0">Tryck på en avdelning för att se vad den heter. Bokstav och siffra står på skyltarna i taket.
     <a href="https://www.gekas.se/wp-content/uploads/2026/10/Varuhuskarta_261021.pdf" target="_blank" rel="noopener noreferrer">Gekås karta (PDF)</a></p>
   <div class="row"><button type="button" class="btn primary" id="mapClose">Stäng</button></div>
@@ -561,8 +578,6 @@
     <button type="button" class="btn" id="deptNewAdd">Lägg till</button>
   </div>
   <div class="row">
-  <ol class="routelist" id="routeList" hidden></ol>
-  <button type="button" class="maplink mapback" id="mapBack" hidden>← Tillbaka till rutten</button>
     <button type="button" class="btn" id="deptSetUndo">Ångra</button>
     <button type="button" class="btn" id="deptSetReset">Återställ standard</button>
   </div>
@@ -1482,10 +1497,12 @@
     // Planen en trappa upp och ner: bara det som behövs, eller alla när inget är valt.
     FLOORS.forEach(function (fl) {
       if (d && d.level !== fl.level) return;
+      if (route && !route.order.some(function (g) { return g.dept.level === fl.level; })) return;
       var BW = 170, rowsN = fl.blocks.some(function (bl) { return bl.y >= 1; }) ? 2 : 1;
       var s2 = svgEl('svg', { viewBox: '0 0 ' + (2 * BW + 2) + ' ' + (rowsN * 40 + 18), 'class': 'map floor', role: 'img',
         'aria-label': fl.level + (route ? ', rutten är markerad' : d ? ', ' + d.name + ' är markerad' : '') }, box);
       svgText(s2, 1, 11, fl.level + (fl.level === 'Plan 2' ? ' · rulltrappa vid F10' : ' · trappa vid J2'), 'floorname');
+      var done = {};
       fl.blocks.forEach(function (bl) {
         var bd = deptById(bl.dept), on = isOn(bd);
         var g = svgEl('g', { 'class': 'cell' + (on ? ' on' : '') + (bd ? '' : ' svc'), 'data-dept': bd ? bd.id : '', 'data-name': bl.t }, s2);
@@ -1493,26 +1510,9 @@
         if (bd && !on) rc.style.fill = bd.color || '';
         if (focus && !on) g.style.opacity = '.3';
         svgText(g, (bl.x + bl.w / 2) * BW, 16 + (bl.y + bl.h / 2) * 40 + 4, bl.t, 'blk');
+        if (route && on && !done[bd.id]) { done[bd.id] = 1; badge(s2, bl.x * BW + 12, 16 + bl.y * 40 + 12, String(num[bd.id])); }
       });
     });
-  }
-  // Tryck på en ruta: visa den avdelningen (eller namnet på t.ex. Sportbaren).
-      if (route && !route.order.some(function (g) { return g.dept.level === fl.level; })) return;
-  $('mapBox').onclick = function (e) {
-    var g = e.target.closest && e.target.closest('.cell'); if (!g) return;
-    var id = g.getAttribute('data-dept');
-    mapRoute = null; mapDept = id || ''; drawMap();
-      var done = {};
-    if (!id) $('mapWhere').textContent = g.getAttribute('data-name');
-  };
-  $('mapClose').onclick = function () { $('mapDlg').close(); };
-  $('mapBtn').onclick = function () { openMap(''); };
-  $('mapBtn2').onclick = function () { openMap(''); };
-
-  /* Inställning: ordning, namn, egna avdelningar, återställ */
-        if (route && on && !done[bd.id]) { done[bd.id] = 1; badge(s2, bl.x * BW + 12, 16 + bl.y * 40 + 12, String(num[bd.id])); }
-  function renderDeptSettings() {
-    var list = sortedDepts(), box = $('deptSetList'); box.innerHTML = '';
     // Listan under kartan: i ruttens ordning, med sakerna.
     var ol = $('routeList'); ol.innerHTML = ''; ol.hidden = !route;
     if (route) route.order.forEach(function (g) {
@@ -1533,6 +1533,21 @@
     var g = svgEl('g', { 'class': 'badge' }, parent);
     svgEl('rect', { x: x - (txt.length > 2 ? 12 : 7.5), y: y - 7.5, width: txt.length > 2 ? 24 : 15, height: 15, rx: 7.5 }, g);
     svgText(g, x, y + 3.2, txt, '');
+  }
+  // Tryck på en ruta: visa den avdelningen (eller namnet på t.ex. Sportbaren).
+  $('mapBox').onclick = function (e) {
+    var g = e.target.closest && e.target.closest('.cell'); if (!g) return;
+    var id = g.getAttribute('data-dept');
+    mapRoute = null; mapDept = id || ''; drawMap();
+    if (!id) $('mapWhere').textContent = g.getAttribute('data-name');
+  };
+  $('mapClose').onclick = function () { $('mapDlg').close(); };
+  $('mapBtn').onclick = function () { openMap(''); };
+  $('mapBtn2').onclick = function () { openMap(''); };
+
+  /* Inställning: ordning, namn, egna avdelningar, återställ */
+  function renderDeptSettings() {
+    var list = sortedDepts(), box = $('deptSetList'); box.innerHTML = '';
     list.forEach(function (d, i) {
       var row = document.createElement('div'); row.className = 'deptrow';
       var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
